@@ -86,7 +86,8 @@ jQuery(function($){
             IO.socket.on('userLeavingMyLobby', App.Host.playerLeavingMyLobby ); //A player is attempting to join my lobby
             IO.socket.on('seatChangedREQ', App.Host.seatChangeREQ ); //A player is attempting to change their seat
             IO.socket.on('readyChangedREQ', App.Host.readyChangeREQ ); //A player is attempting to change their seat
-            IO.socket.on('betChangedREQ', App.Host.betChangeREQ ); //A player is attempting to change their seat
+            IO.socket.on('betChangedREQ', App.Host.betChangeREQ ); //A player is attempting to change their bet
+            IO.socket.on('hitChangedREQ', App.Host.hitChangeREQ ); //A player is attempting to hit or stay
             
             //Player Events
             IO.socket.on('playerJoinACK', App.Player.myselfhasJoined ); //The Host has ACK my request to join
@@ -94,11 +95,11 @@ jQuery(function($){
             IO.socket.on('userLeavingOurLobby', App.Player.playerLeavingOurLobby ); //A player is attempting to join my lobby
             IO.socket.on('hostLeavingOurLobby', App.Player.hostLeavingOurLobby ); //A player is attempting to join my lobby
             IO.socket.on('seatChangedACK', App.Player.seatChangeACK ); //A player seat has changed
-            IO.socket.on('readyChangedACK', App.Player.readyChangeACK ); //A player seat has changed
-            IO.socket.on('timeChangedACK', App.Player.timeChangeACK ); //A player seat has changed
-            IO.socket.on('gameStageChangedACK', App.Player.gameStageChangeACK ); //A player seat has changed
+            IO.socket.on('readyChangedACK', App.Player.readyChangeACK ); //A player's status has changed
+            IO.socket.on('timeChangedACK', App.Player.timeChangeACK ); //Time Counter has changed
+            IO.socket.on('gameStageChangedACK', App.Player.gameStageChangeACK ); //Game Stage has changed
             IO.socket.on('betChangedACK', App.Player.betChangeACK ); //A player seat has changed
-            IO.socket.on('dealChangedACK', App.Player.dealChangeACK ); //A player seat has changed
+            IO.socket.on('dealChangedACK', App.Player.dealChangeACK ); //A player hand has changed
         },
         //I have made a new socket with the sever (main menu screen)
         onConnected : function(socID) {
@@ -246,7 +247,7 @@ jQuery(function($){
             timeChangeACK: function (data) {GameRoomData.timeLeft = data;},
             gameStageChangeACK: function (data) {GameRoomData.gameId = data.gameId; GameRoomData.hostSocketId = data.hostSocketId;
                 GameRoomData.playerCount = data.playerCount; GameRoomData.playerLimit = data.playerLimit; 
-                GameRoomData.gameStage = data.gameStage; GameRoomData.timeLeft = data.timeLeft;
+                GameRoomData.gameStage = data.gameStage; GameRoomData.timeLeft = data.timeLeft; GameRoomData.turn = data.turn;
                 GameRoomData.Players = new Map(JSON.parse(data.Players)); GameRoomData.color = data.color;
             },
             betChangeACK: function (data) {GameRoomData.Players.set(data.mySocketId.toString(), data.updatePlayer);},
@@ -271,7 +272,8 @@ jQuery(function($){
                         littleCards[littleCards.length-1].Card = new Card(deckLoc.x, deckLoc.y, data.updateCard, 'FRONT', false, cardLoc.rad);
                         littleCards[littleCards.length-1].Card.animateCardTo(cardLoc.x, cardLoc.y, 500, ctx);
                         GameRoomData.Players.set(data.updatePlayerId.toString(), updatePlayer);}
-                    updateSeatArray();}}
+                    updateSeatArray();}},
+            hitChangeACK: function (data) {GameRoomData.Players.set(data.mySocketId.toString(), data.updatePlayer);}
         },
         Host : {
             //Once the Create button is pressed, change html to display new options
@@ -459,9 +461,24 @@ jQuery(function($){
                 else if(data.betREQ == 'd10') {if(tempPlayer.bank >= 10) {tempPlayer.bank = tempPlayer.bank - 10; tempPlayer.bet = tempPlayer.bet + 10;}}
                 else if(data.betREQ == 'd100') {if(tempPlayer.bank >= 100) {tempPlayer.bank = tempPlayer.bank - 100; tempPlayer.bet = tempPlayer.bet + 100;}}
                 else if(data.betREQ == 'd1000') {if(tempPlayer.bank >= 1000) {tempPlayer.bank = tempPlayer.bank - 1000; tempPlayer.bet = tempPlayer.bet + 1000;}}
+                else if(data.betREQ == 'Stay') {tempPlayer.ready = true; console.log(tempPlayer)}
                 GameRoomData.Players.set(data.mySocketId.toString(), tempPlayer);
                 let transmitData = {gameId: data.gameId, mySocketId: data.mySocketId, updatePlayer: tempPlayer}
                 IO.socket.emit('betChangedACK', transmitData);
+            },
+            //data = {
+            //    gameId:
+            //    updatePlayer:
+            //    hitREQ:
+            //    mySocketId:
+            //}
+            hitChangeREQ: function (data) {
+                console.log('hitChangedREQ');
+                let tempPlayer = GameRoomData.Players.get(data.mySocketId.toString());
+                if(data.hitREQ == 'Stay') {tempPlayer.ready = true; console.log(tempPlayer);}
+                GameRoomData.Players.set(data.mySocketId.toString(), tempPlayer);
+                let transmitData = {gameId: data.gameId, mySocketId: data.mySocketId, updatePlayer: tempPlayer}
+                IO.socket.emit('hitChangedACK', transmitData);
             }
         }
     };
@@ -845,6 +862,7 @@ class Deck {
     function checkBettingButtons(betBool, button, string) {
         if(betBool == true) {
             button.isClicked = true;
+            console.log(string);
             let myself = GameRoomData.Players.get(sockets.id.toString());
             let dataPacket = {gameId: GameRoomData.gameId, updatePlayer: myself, betREQ: 'NULL', mySocketId: sockets.id}
             if(string == 'Bet' && (myself.ready == false && myself.fold == false)) {
@@ -860,9 +878,9 @@ class Deck {
                     sockets.emit('betChangedACK', dataPacket);} else {dataPacket.betREQ = 'Fold'; sockets.emit('betChangedREQ', dataPacket);}}
             else if(string == 'Hit' && (myself.ready == false && myself.fold == false)) {
                 if(sockets.id.toString() == GameRoomData.hostSocketId.toString()) {
-
                     sockets.emit('hitChangedACK', dataPacket);} else {dataPacket.hitREQ = 'Hit'; sockets.emit('hitChangedREQ', dataPacket);}}
             else if(string == 'Stay' && (myself.ready == false && myself.fold == false)) {
+                console.log(myself.ready);
                 if(sockets.id.toString() == GameRoomData.hostSocketId.toString()) {
                     myself.ready = true;
                     sockets.emit('hitChangedACK', dataPacket);} else {dataPacket.hitREQ = 'Stay'; sockets.emit('hitChangedREQ', dataPacket);}}
@@ -1173,9 +1191,8 @@ class Deck {
             StayButton.draw(ctx);
         }
         //Draw Green dot for active turn player
-        console.log(GameRoomData.turn);
         let thisSeat = GameRoomData.Seats[GameRoomData.turn];
-        if(thisSeat.Player != undefined) {
+        if(thisSeat != undefined && thisSeat.Player != undefined) {
             let xDot = 0;
             let yDot = SeatCoordsArray[GameRoomData.turn].y+height/32;
             if(GameRoomData.turn <= GameRoomData.playerLimit/2) {
@@ -1186,15 +1203,16 @@ class Deck {
 
         //Run has Host
         if(sockets.id.toString() == GameRoomData.hostSocketId || sockets.id == GameRoomData.hostSocketId) {
-            if(GameRoomData.turn <= GameRoomData.playerLimit) { //Make sure the turn is within the number of seats
-                if(GameRoomData.turn <= 0 || GameRoomData.turn == undefined) {GameRoomData.turn = 1;}   //If turn is still zero
-                if(GameRoomData.Seats[GameRoomData.turn].Player == undefined) {GameRoomData.turn = GameRoomData.turn + 1;}    //Go to next seat until there is a player there
-                if(GameRoomData.Seats[GameRoomData.turn].Player != undefined) {
-                    if(GameRoomData.Seats[GameRoomData.turn].Player.ready == true) {GameRoomData.turn = GameRoomData.turn + 1;}}}}   //Go to next player once player is finished with their turn
-        //Once everyone has played
-        if(GameRoomData.turn > GameRoomData.playerLimit) {
-            GameRoomData.gameStage = '4';
-            sendUpdateGameStage();
+            if(GameRoomData.turn <= GameRoomData.playerLimit && GameRoomData.Seats[GameRoomData.turn] != undefined) { //Make sure the turn is within the number of seats
+                if(GameRoomData.turn <= 0 || GameRoomData.turn == undefined) {GameRoomData.turn = 1; sendUpdateGameStage();}   //If turn is still zero
+                else if(GameRoomData.Seats[GameRoomData.turn].Player == undefined) {GameRoomData.turn = GameRoomData.turn + 1; sendUpdateGameStage();}    //Go to next seat until there is a player there
+                else if(GameRoomData.Seats[GameRoomData.turn].Player != undefined) {
+                    if(GameRoomData.Seats[GameRoomData.turn].Player.ready == true) {GameRoomData.turn = GameRoomData.turn + 1; sendUpdateGameStage();}}}   //Go to next player once player is finished with their turn
+            //Once everyone has played
+            if(GameRoomData.turn > GameRoomData.playerLimit) {
+                GameRoomData.gameStage = '4';
+                sendUpdateGameStage();
+            }
         }
     }
     //Draw count down bar
@@ -1260,7 +1278,7 @@ class Deck {
         let updatePlayers = JSON.stringify(Array.from(GameRoomData.Players));
         let dataPacket = {gameId: GameRoomData.gameId, hostSocketId: GameRoomData.hostSocketId, 
             playerCount: GameRoomData.playerCount, playerLimit: GameRoomData.playerLimit, 
-            gameStage: GameRoomData.gameStage, round: GameRoomData.round, timeLeft:  GameRoomData.timeLeft, 
+            gameStage: GameRoomData.gameStage, round: GameRoomData.round, timeLeft:  GameRoomData.timeLeft, turn: GameRoomData.turn,
             Players: updatePlayers, color: GameRoomData.color}
         sockets.emit('gameStageChangedACK', dataPacket);}
 

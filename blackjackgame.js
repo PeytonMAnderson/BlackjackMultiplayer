@@ -43,12 +43,14 @@ exports.connectedToServer = function(sio, soc){
     socket.on('gameStageChangedACK', gameStageChangedACK);
     socket.on('betChangedACK', betChangedACK);
     socket.on('dealChangedACK', dealChangedACK);
+    socket.on('hitChangedACK', hitChangedACK);
     
     // Player emits
     socket.on('playerJoinAttempt', playerJoinAttempt);
     socket.on('seatChangedREQ', seatChangedREQ);
     socket.on('readyChangedREQ', readyChangedREQ);
     socket.on('betChangedREQ', betChangedREQ);
+    socket.on('hitChangedREQ', hitChangedREQ);
 }
 //An error has occured, throw error to user that caused it
 // data = {
@@ -193,3 +195,15 @@ function betChangedREQ (data) {
 function betChangedACK (data) {this.broadcast.to(data.gameId.toString()).emit('betChangedACK', data);}
 
 function dealChangedACK (data) {this.broadcast.to(data.gameId.toString()).emit('dealChangedACK', data);}
+
+//data = {
+//    gameId:
+//    updatePlayer:
+//    hitREQ:
+//    mySocketId:
+//}
+function hitChangedREQ (data) {
+    let gameRoom = RoomsData.get(data.gameId.toString());
+    this.broadcast.to(gameRoom.hostSocketId.toString()).emit('hitChangedREQ', data);
+}
+function hitChangedACK (data) {this.broadcast.to(data.gameId.toString()).emit('hitChangedACK', data);}
