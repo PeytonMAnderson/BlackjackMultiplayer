@@ -1,3 +1,6 @@
+//Attempt to open a new Socket IO port
+var sockets = io();
+
 jQuery(function($){    
     'use strict';
 
@@ -49,7 +52,29 @@ jQuery(function($){
             App.mySocketId = socID;
             console.log('Connected! Session ID: ' + App.mySessionId);
             console.log('Connected! Socket ID: ' + App.mySocketId);
-            App.$gameArea.html(App.$blackMainMenu);
+
+            //Get Room code from URL
+            let path = window.location.pathname;
+            let pathAry = path.split('/');
+            let currentGameId = pathAry[pathAry.length-1];
+
+            //POST to server to see if room is set up already
+            let data = {gameId: currentGameId, mySocketId: App.mySocketId}
+            var formBody = [];
+            for (var property in data) {
+                var encodedKey = encodeURIComponent(property);
+                var encodedValue = encodeURIComponent(data[property]);
+                formBody.push(encodedKey + "=" + encodedValue);
+            }
+            formBody = formBody.join("&");
+            fetch(window.location.href, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
+                },
+                body: formBody
+            });
+            App.$gameArea.html(App.$templatePlayerLobby);
         },
         //Display Error from server
         errorHandle : function(error) {
@@ -125,28 +150,6 @@ jQuery(function($){
             //    hostSocketId:
             //}
             onServerMadeRoom : function(data) {
-                console.log('Lobby Created!');
-                //Create GameRoomData information
-                GameRoomData.hostSocketId = data.hostSocketId;
-                GameRoomData.gameId = data.gameId;
-                GameRoomData.playerCount = 1;
-                GameRoomData.playerLimit = 8;
-                GameRoomData.timeLeft = 'NULL';
-                GameRoomData.gameStage = 0;
-                GameRoomData.round = 0;
-                let R = Math.floor(Math.random() * 255);
-                let G = Math.floor(Math.random() * 255);
-                let B = Math.floor(Math.random() * 255);
-                let randColor = R + ',' + G + ',' + B;
-                GameRoomData.color = randColor;
-                let playerData = {myName: data.myName,  mySeat: 0, mySocketId: sockets.id,  bank: 2000, bet: 0, ready: false, fold: false, Hand: []}
-                GameRoomData.Players.set(sockets.id.toString(), playerData);    //Add Player to the GameRoomData
-                for(let i = 1; i <= GameRoomData.playerLimit; i++) {GameRoomData.Seats[i] = {occupied: false};}      //Create an array for each seat whether they are occupied or not
-                //Update HTML
-                App.$gameArea.html(App.$templateHostLobby);
-                document.getElementById("t2").innerHTML = GameRoomData.gameId;
-                document.getElementById("t1").innerHTML = GameRoomData.playerCount + '/' + GameRoomData.playerLimit;
-                runJavaScriptApp();
             },
             playerJoiningAttempt: function(data) {
             },

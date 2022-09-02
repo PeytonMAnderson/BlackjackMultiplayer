@@ -129,6 +129,7 @@ jQuery(function($){
                 },
                 body: formBody
             });
+            App.$gameArea.html(App.$templatePlayerLobby);
         },
         //Display Error from server
         errorHandle : function(error) {
