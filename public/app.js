@@ -107,7 +107,28 @@ jQuery(function($){
             App.mySocketId = socID;
             console.log('Connected! Session ID: ' + App.mySessionId);
             console.log('Connected! Socket ID: ' + App.mySocketId);
-            App.$gameArea.html(App.$blackMainMenu);
+
+            //Get Room code from URL
+            let path = window.location.pathname;
+            let pathAry = path.split('/');
+            let currentGameId = pathAry[pathAry.length-1];
+
+            //POST to server to see if room is set up already
+            let data = {gameId: currentGameId, mySocketId: App.mySocketId}
+            var formBody = [];
+            for (var property in data) {
+                var encodedKey = encodeURIComponent(property);
+                var encodedValue = encodeURIComponent(data[property]);
+                formBody.push(encodedKey + "=" + encodedValue);
+            }
+            formBody = formBody.join("&");
+            fetch(window.location.href, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
+                },
+                body: formBody
+            });
         },
         //Display Error from server
         errorHandle : function(error) {
