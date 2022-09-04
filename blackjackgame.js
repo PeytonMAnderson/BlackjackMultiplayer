@@ -11,6 +11,7 @@ exports.connectedToServer = function(sio, soc){
     console.log('User Connected: ' + socket.id);
     //A player is disonnecting...
     socket.on('disconnecting', () => {
+       
         let sock = soc;
         if(sock.rooms != undefined) {
             let lobbies = Array.from(sock.rooms); //Get Array of rooms the disconnecting user is in [0] = personal SocketId, [1] = Game Room Id (if any)
