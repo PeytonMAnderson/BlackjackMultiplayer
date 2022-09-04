@@ -7,7 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
     <!-- Let's borrow a cool looking Font from Google -->
     <link href='https://fonts.googleapis.com/css?family=Quicksand:300,400,700' rel='stylesheet' type='text/css'>
-    <link href="../css/styles.css" rel="stylesheet">
+    <link href="../../css/styles.css" rel="stylesheet">
   </head>
   <body>
     <div id="gameArea"></div>
@@ -16,17 +16,15 @@
                 BLACKJACK MULTIPLAYER
             </div>
             <div class = "subtitle">
-                JOIN GAME
+                CREATE GAME
             </div>
-            <form id="joinGame" action="./lobby" method="POST">
+            <form id="createGame" action="./lobby" method="POST">
                 <div class="info">
-                    <label for="joinPlayerName">PLAYER NAME</label>
-                    <input name="joinPlayerName" type="text"/>
-                    <label for="joinGame">GAME ID</label>
-                    <input name="joinGame" type="text"/>
+                    <label for="createPlayerName">PLAYER NAME</label>
+                    <input name="createPlayerName" type="text"/>
                 </div>
                 <div class="buttons">
-                    <button type="submit" id="btnJoinGame" class="btn">JOIN</button>
+                    <button type="submit" id="btnStartCreateGame" class="btn">CREATE</button>
                     <div style="clear:both"></div>
                 </div>
             </form>

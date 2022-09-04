@@ -16,25 +16,25 @@ app.get('/', (req, res) => {
 
 //Singleplayer
 app.get('/singleplayer', (req, res) => {
-  res.sendFile(__dirname + '/public/singleplayer.html');
+  res.sendFile(__dirname + '/public/singleplayer/singleplayer.html');
 });
 
 //Multiplayer Main Menu
 app.get('/multiplayer', (req, res) => {
-  res.sendFile(__dirname + '/public/multiplayer.html');
+  res.sendFile(__dirname + '/public/multiplayer/multiplayer.html');
 });
 
 //Multiplayer Create Menu
 app.get('/multiplayer/create', (req, res) => {
-  res.sendFile(__dirname + '/public/create.html');
+  res.sendFile(__dirname + '/public/multiplayer/create.html');
 });
 
 //Multiplayer Join Menu
 app.get('/multiplayer/join', (req, res) => {
-  res.sendFile(__dirname + '/public/join.html');
+  res.sendFile(__dirname + '/public/multiplayer/join.html');
 });
 
-//Multiplayer join lobby
+//#1  User wants to join or create new lobby
 app.post('/multiplayer/lobby', (req, res) => {
   //Invalid JSON
   if(req.body == null && req.body == '') {return;}
@@ -48,19 +48,18 @@ app.post('/multiplayer/lobby', (req, res) => {
     return;
 
   //Player submitted join game data
-  } else if(req.body.joinPlayerName != null) {
-    let name = req.body.joinPlayerName;
+  } else {
     let game = req.body.joinGame;
     res.redirect(req.url + '/' + game);
     return;
   }
-  return;
 });
 
 //Multiplayer in lobby
 app.get('/multiplayer/lobby/:id', (req, res) => {
+    //#2 See if lobby in URL exists already or not, if it does, update html
     if(bj.getGame(req.params.id) == 'NULL' || bj.getGame(req.params.id) == null) {res.status(404).send("Game Room Not Found");} else {
-      res.sendFile(__dirname + '/public/game.html');
+      res.sendFile(__dirname + '/public/multiplayer/game.html');
     }
 });
 app.post('/multiplayer/lobby/:id', (req, res) => {

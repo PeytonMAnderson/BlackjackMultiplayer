@@ -7,10 +7,29 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
     <!-- Let's borrow a cool looking Font from Google -->
     <link href='https://fonts.googleapis.com/css?family=Quicksand:300,400,700' rel='stylesheet' type='text/css'>
-    <link href="../../css/styles.css" rel="stylesheet">
+    <link href="../../../css/styles.css" rel="stylesheet">
   </head>
   <body>
     <div id="gameArea"></div>
+
+    <script id="black-main-join" type="text/template">
+        <div class="titleWrapper">
+            <div class="title">
+                BLACKJACK MULTIPLAYER
+            </div>
+            <div class = "subtitle">
+                JOIN GAME
+            </div>
+            <div class="info">
+                <label for="inputPlayerName">PLAYER NAME</label>
+                <input id="inputPlayerName" type="text" />
+            </div>
+            <div class="buttons">
+                <button id="btnSendName" class="btn">JOIN</button>
+                <div style="clear:both"></div>
+            </div>
+        </div>
+    </script>
 
     <script id="black-canvas-player" type="text/template">
         <div class="titleWrapper">
@@ -46,8 +65,9 @@
         </div>
     </script>
 
-    <script src="../../libs/jquery-3.6.0.js"></script>
+    <script src="../../../libs/jquery-3.6.0.js"></script>
     <script src="/socket.io/socket.io.js"></script>
-    <script src="../../appRefactored.js" defer></script>
+    <script src="../appRefactored.js" defer></script>
+    <script src="../animate.js" defer></script>
   </body>
 </html>
