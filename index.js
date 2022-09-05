@@ -6,9 +6,12 @@ const server = http.createServer(app);
 const { Server } = require('socket.io');
 const io = new Server(server);
 const config = require('./config.json');
+const serveIndex = require('serve-index');
+const path = require('path');
 
 app.use(express.static(__dirname + '/public'));
 app.use(express.urlencoded({ extended: true }));
+app.use('/textures', serveIndex(path.join(__dirname, '/public/textures')));
 
 //Main Menu
 app.get('/', (req, res) => {res.sendFile(__dirname + '/public/index.html');});

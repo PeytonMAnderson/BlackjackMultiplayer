@@ -52,6 +52,8 @@ jQuery(function($){
             //Host Events
             IO.socket.on('playerJoinREQ', App.Host.playerJoinREQ); //Host determines if player can join
             IO.socket.on('playerLeft', App.Host.playerLeft); //A player has left the lobby
+            IO.socket.on('seatChangeREQ', App.Host.seatChangeREQ); //A player is trying to change seats
+            IO.socket.on('readyChangeREQ', App.Host.readyChangeREQ); //A player is trying to ready or unready
             //Player Events
             IO.socket.on('gameUpdateACK', App.Player.gameUpdateACK); //Used for any game update during the game
             IO.socket.on('hostLeft', App.Player.hostLeft);  //The host left, remove everyone
@@ -156,7 +158,6 @@ jQuery(function($){
                     runJavaScriptApp();
                 }
                 //Update everything for everyone
-                console.log(data);
                 GameRoomData = {
                     gameId: data.gameId,               
                     hostSocketId: data.hostSocketId,               
@@ -197,23 +198,23 @@ jQuery(function($){
                 if(GameRoomData.LostPlayers.has(data.name)) {
                     //Player is a previous player
                     let returningPlayer = GameRoomData.LostPlayers.get(data.name);
-                    if(GameRoomData.Seats[returningPlayer.seat] != 'EMPTY') {
+                    if(GameRoomData.Seats[returningPlayer.seat] == 'EMPTY') {
                         //If seat is still open, just copy data to seat
-                        GameRoomData.Seats[returningPlayer.seat] = returningPlayer;
+                        ind = returningPlayer.seat;
                     } else {
                         //If seat is not open, but still room in lobby, find new seat
                         while(GameRoomData.Seats[ind] != 'EMPTY' && ind < GameRoomData.playerLimit) {ind++;}
                         if(GameRoomData.Seats[ind] != 'EMPTY') {console.log('Unable to find empty seat!'); return;}
-                        updatePlayer(returningPlayer.myName, 
-                                    returningPlayer.myHand, 
-                                    data.socketId,
-                                    returningPlayer.bank, 
-                                    returningPlayer.bet, 
-                                    returningPlayer.ready, 
-                                    returningPlayer.fold, 
-                                    returningPlayer.win, 
-                                    ind);
                     }
+                    updatePlayer(returningPlayer.myName, 
+                        returningPlayer.myHand, 
+                        data.socketId,
+                        returningPlayer.bank, 
+                        returningPlayer.bet, 
+                        returningPlayer.ready, 
+                        returningPlayer.fold, 
+                        returningPlayer.win, 
+                        ind);
                     GameRoomData.LostPlayers.delete(returningPlayer.myName);
                 } else {
                     //Completely new player
@@ -236,6 +237,22 @@ jQuery(function($){
                         sendGameUpdate();
                     }
                 }
+            },
+            seatChangeREQ : function (data) {
+                if(GameRoomData.Seats[data.seat] == 'EMPTY') {
+                    GameRoomData.Seats[data.seat] = GameRoomData.Seats[data.player.seat];
+                    GameRoomData.Seats[data.player.seat] = 'EMPTY';
+                    GameRoomData.Seats[data.seat].seat = data.seat;
+                    sendGameUpdate();
+                }
+            },
+            readyChangeREQ : function (data) {
+                if(GameRoomData.Seats[data.player.seat].ready == true) {
+                    GameRoomData.Seats[data.player.seat].ready = false;
+                } else {
+                    GameRoomData.Seats[data.player.seat].ready = true;
+                }
+                sendGameUpdate();
             }
         }
     };
@@ -281,7 +298,6 @@ jQuery(function($){
     document.getElementById("t2").innerHTML = GameRoomData.gameId;  //Add gameId to top bar
     document.getElementById("t1").innerHTML = GameRoomData.playerCount + '/' + GameRoomData.playerLimit;    //Add playercount to top bar
     sockets.emit('gameUpdate', transmitData);
-    console.log(transmitData);
  }
  function requestPlayerToJoin(seatIndex) {
     let data = {Player: GameRoomData.Seats[seatIndex], gameId: GameRoomData.gameId}
