@@ -11,28 +11,29 @@ exports.connectedToServer = function(sio, soc){
     console.log('User Connected: ' + socket.id);
     //A player is disonnecting...
     socket.on('disconnecting', () => {
-       
-        let sock = soc;
-        if(sock.rooms != undefined) {
-            let lobbies = Array.from(sock.rooms); //Get Array of rooms the disconnecting user is in [0] = personal SocketId, [1] = Game Room Id (if any)
-            if(lobbies.length > 1) {
-                //Player is in a lobby
-                let hostOfLobby = RoomsData.get(lobbies[1].toString()); //Get the host Socket Id of the lobby the player is in
-                //If player is host, kick everyone
-                if(lobbies[0] == hostOfLobby.hostSocketId) {
-                    //Player is a host, destroy lobby
-                    console.log('Host is leaving the lobby!');
-                    sock.broadcast.to(lobbies[1].toString()).emit('hostLeavingOurLobby');   //Broadcast Host Left event
-                    RoomsData.delete(lobbies[1].toString());    //Delete Game Room in Server List
-                    io.in(lobbies[1].toString()).socketsLeave(lobbies[1].toString());   //Force everyone to leave the Game Room
-                } else {
-                    //Player is just a player
-                    let myRoomData = RoomsData.get(lobbies[1].toString());
-                    let data = {mySocketId: lobbies[0]}
-                    sock.broadcast.to(myRoomData.hostSocketId.toString()).emit('userLeavingMyLobby', data);   //Send User who left to the Host
+        try {
+            let sock = soc;
+            if(sock.rooms != undefined) {
+                let lobbies = Array.from(sock.rooms); //Get Array of rooms the disconnecting user is in [0] = personal SocketId, [1] = Game Room Id (if any)
+                if(lobbies.length > 1) {
+                    //Player is in a lobby
+                    let hostOfLobby = RoomsData.get(lobbies[1].toString()); //Get the host Socket Id of the lobby the player is in
+                    //If player is host, kick everyone
+                    if(lobbies[0] == hostOfLobby.hostSocketId) {
+                        //Player is a host, destroy lobby
+                        console.log('Host is leaving the lobby!');
+                        sock.broadcast.to(lobbies[1].toString()).emit('hostLeavingOurLobby');   //Broadcast Host Left event
+                        RoomsData.delete(lobbies[1].toString());    //Delete Game Room in Server List
+                        io.in(lobbies[1].toString()).socketsLeave(lobbies[1].toString());   //Force everyone to leave the Game Room
+                    } else {
+                        //Player is just a player
+                        let myRoomData = RoomsData.get(lobbies[1].toString());
+                        let data = {mySocketId: lobbies[0]}
+                        sock.broadcast.to(myRoomData.hostSocketId.toString()).emit('userLeavingMyLobby', data);   //Send User who left to the Host
+                    }
                 }
             }
-        }
+        } catch (error) {console.log(error);}
     });
     // Host emits
     socket.on('hostCreateNewGame', hostCreateNewGame);
