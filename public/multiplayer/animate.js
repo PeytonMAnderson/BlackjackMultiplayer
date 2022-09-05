@@ -4,8 +4,8 @@ var menu;
 var ctx;
 var width;
 var height;
-var fontSize = getSize('FONT');
-var pad = getSize('PAD');
+var fontSize;
+var pad;
 
 //Timing Variables
 var reqAnim;
@@ -14,26 +14,27 @@ var startTimer = false;
 var beginTime = 0;
 var timeElapsed = 0;
 var FPS = 0;
+var FPSText;
 
 //Controls elements of text on screen
 class ScreenText {
-    constructor(Text, color, format, size, font, posX, posY, maxWidth, Alignment) {
+    constructor(Text, color, format, fontS, font, posX, posY, maxWidth, Alignment) {
         this.text = Text;
         this.color = color;
         this.format = format;
-        this.size = size;
+        this.size = fontS;
         this.font = font;
         this.x = posX;
         this.y = posY;
         this.maxWidth = maxWidth;
         this.align = Alignment;}
     //Methods
-    draw() {
-        ctx.fillStyle = 'rgb(' + this.color + ')';
+    draw(ctx) {
+        //ctx.fillStyle = 'rgb(' + this.color + ')';
         ctx.font = this.format + ' ' + this.size + 'px' + ' ' + this.font;
         ctx.textAlign = this.align;
+        ctx.fillStyle = 'rgb(' + 255 + ',' + 255 + ',' + 255 + ')';
         ctx.fillText(this.text, this.x, this.y, this.maxWidth);}}
-
 //Controls Elements of a Button
 class ScreenButton extends ScreenText {
     constructor(screenText, colorString, posX, posY, xSize, ySize) {
@@ -47,7 +48,7 @@ class ScreenButton extends ScreenText {
         this.x2 = this.x + this.width;
         this.y2 = this.y + this.height;
         this.isClicked = false;}
-    draw() {
+    draw(ctx) {
         let colorArray = this.buttonColor.split(',');
         let R = colorArray[0];
         let G = colorArray[1];
@@ -63,9 +64,6 @@ class ScreenButton extends ScreenText {
         if(cursorX >= this.x && cursorX <= this.x2) {
             if(cursorY >= this.y && cursorY <= this.y2) {return true;}} return false;}}
 
-//Set up timing variables
-var FPSText = new ScreenText('0','255,255,255','bold', fontSize, 'Ariel', width/2, height/2, width/8, 'right');
-
 function runJavaScriptApp() {
     //-----------------------------------------------------------------------------------------------------------
     //INITIALIZE DEPENDANCIES
@@ -75,6 +73,10 @@ function runJavaScriptApp() {
     ctx = canvas.getContext('2d');
     width = canvas.width = window.innerWidth;
     height = canvas.height = window.innerHeight-menu.offsetHeight;
+    fontSize = getSize('FONT');
+    pad = getSize('PAD');
+
+    FPSText = new ScreenText('0','255,255,255','bold', fontSize, 'Ariel', width, fontSize, width/8, 'right');
     //Start Game
     window.requestAnimationFrame(animateFrame);
 }
@@ -95,8 +97,7 @@ function animateFrame(timeStamp) {
         //ANIMATION FRAMES
         //Add player list in desktop mode
         drawBackground(GameRoomData.color);
-        ctx.fillStyle = 'rgb(' + 255 + ',' + 255 + ',' + 255 + ')';
-        ctx.fillText('TEST', width/2, height/2, width/8);
+        drawLeaderBoard();
         switch(GameRoomData.gameStage) {
             case 0:
                 break;
@@ -111,7 +112,7 @@ function animateFrame(timeStamp) {
                 break;
         }
     }
-    FPSText.draw();
+    FPSText.draw(ctx);
     previousTimeStamp = timeStamp;
     reqAnim = window.requestAnimationFrame(animateFrame);
 }
@@ -122,10 +123,20 @@ function drawBackground(RGBCOLOR) {
     ctx.fillRect(0,0,width,height);
 }
 
-//Draw Leaderboard on capable devices
+//Display Player LeaderBoard
 function drawLeaderBoard() {
-
-}
+    if(GameRoomData.hostSocketId == sockets.id) {
+        if(width >= height) {
+            let playerNumber = 0;
+            for (let i = 0; i < GameRoomData.playerLimit; i++) {
+                if(GameRoomData.Seats[i] != 'EMPTY' && GameRoomData.Seats[i] != null) {
+                    ctx.fillStyle = 'rgb(50,150,50)';
+                    ctx.fillRect(0, playerNumber*(fontSize+(pad/2))+height/64, width/4, fontSize);
+                    let text = new ScreenText(GameRoomData.Seats[i].myName,'255,255,255','bold', fontSize, 'Ariel', 0, playerNumber*(fontSize+(pad/2))+fontSize-fontSize/6+height/64, width/8, 'start');
+                    let text2 = new ScreenText('$'+GameRoomData.Seats[i].bank,'255,255,255','bold', fontSize, 'Ariel', width/4, playerNumber*(fontSize+(pad/2))+fontSize-fontSize/6+height/64, width/8, 'right');
+                    text.draw(ctx);
+                    text2.draw(ctx);
+                    playerNumber++;}}}}}
 
 //Get Size of different texts and shapes
 function getSize(typeFor) {

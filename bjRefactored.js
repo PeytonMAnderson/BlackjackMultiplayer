@@ -15,19 +15,19 @@ exports.connectedToServer = function(sio, soc){
             console.log("User Disconnected: " + lobbies[0]);
             if(lobbies.length > 1) {
                 //Player is in a lobby
-                let hostOfLobby = RoomsData.get(lobbies[1].toString()); //Get the host Socket Id of the lobby the player is in
+                let hostOfLobby = RoomsData.get(lobbies[1]); //Get the host Socket Id of the lobby the player is in
                 //If player is host, kick everyone
                 if(lobbies[0] == hostOfLobby.hostSocketId) {
                     //Player is a host, destroy lobby
                     console.log('Host is leaving the lobby!');
-                    sock.broadcast.to(lobbies[1].toString()).emit('hostLeavingOurLobby');   //Broadcast Host Left event
-                    RoomsData.delete(lobbies[1].toString());    //Delete Game Room in Server List
-                    io.in(lobbies[1].toString()).socketsLeave(lobbies[1].toString());   //Force everyone to leave the Game Room
+                    sock.broadcast.to(lobbies[1]).emit('hostLeft');   //Broadcast Host Left event
+                    RoomsData.delete(lobbies[1]);    //Delete Game Room in Server List
+                    io.in(lobbies[1]).socketsLeave(lobbies[1]);   //Force everyone to leave the Game Room
                 } else {
                     //Player is just a player
-                    let myRoomData = RoomsData.get(lobbies[1].toString());
-                    let data = {mySocketId: lobbies[0]}
-                    sock.broadcast.to(myRoomData.hostSocketId.toString()).emit('userLeavingMyLobby', data);   //Send User who left to the Host
+                    console.log("Player is leaving lobby!");
+                    let data = {mySocket: lobbies[0]}
+                    sock.broadcast.to(hostOfLobby.hostSocketId).emit('playerLeft', data);   //Send User who left to the Host
                 }
             }
         }
@@ -35,6 +35,8 @@ exports.connectedToServer = function(sio, soc){
     // Host emits
     socket.on('joinSocket', joinSocket);
     socket.on('getName', getName);
+    socket.on('gameUpdate', gameUpdate);    //Used for every game update during the game
+    socket.on('requestPlayerToJoin', requestPlayerToJoin);
     // Player emits
     socket.on('playerJoinREQ', playerJoinREQ);
 }
@@ -99,3 +101,13 @@ function playerJoinREQ(data) {
     console.log(data.socketId + " is trying to connect to " + data.gameId);
     this.broadcast.to(room.hostSocketId.toString()).emit('playerJoinREQ', data);
 }
+
+//Used for every game update in the game
+function gameUpdate(data) {this.broadcast.to(data.gameId).emit('gameUpdateACK', data);}
+
+//Join incoming player to socket game
+function requestPlayerToJoin(data) {
+    //Add Player to Game Room
+    try {
+        io.sockets.sockets.get(data.Player.mySocket).join(data.gameId.toString());  //Join Game Room
+    } catch (error) {console.log(error);}}
