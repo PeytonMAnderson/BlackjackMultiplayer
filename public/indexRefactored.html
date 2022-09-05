@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+  <head>
+      <title>BLACKJACK</title>
+    <meta charset="utf-8"/>
+    <!-- Ensure that everything scales appropriately on a mobile device -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <!-- Let's borrow a cool looking Font from Google -->
+    <link href='https://fonts.googleapis.com/css?family=Quicksand:300,400,700' rel='stylesheet' type='text/css'>
+    <link href="./css/styles.css" rel="stylesheet">
+  </head>
+
+
+
+  <body>
+    <div id="gameArea"></div>
+
+    <script id="black-main-menu" type="text/template">
+        <div class="titleWrapper">
+            <div class="title">
+                BLACKJACK 
+            </div>
+            <div class = "subtitle">
+                MAIN MENU
+            </div>
+            <div class="buttons">
+                <button id="btnCreateGame" class="btn">CREATE</button>
+                <button id="btnJoinGame" class="btn">JOIN</button>
+                <div style="clear:both"></div>
+            </div>
+        </div>
+    </script>
+
+    <script id="black-main-join" type="text/template">
+        <div class="titleWrapper">
+            <div class="title">
+                BLACKJACK 
+            </div>
+            <div class = "subtitle">
+                JOIN GAME
+            </div>
+            <div class="info">
+                <label for="inputPlayerName">PLAYER NAME</label>
+                <input id="inputPlayerName" type="text" />
+            </div>
+            <div class="info">
+                <label for="inputGameId">GAME ID</label>
+                <input id="inputGameId" type="text"/>
+            </div>
+            <div class="buttons">
+                <button id="btnStartJoinGame" class="btn">JOIN</button>
+                <div style="clear:both"></div>
+            </div>
+        </div>
+    </script>
+
+    <script id="black-main-create" type="text/template">
+        <div class="titleWrapper">
+            <div class="title">
+                BLACKJACK 
+            </div>
+            <div class = "subtitle">
+                CREATE GAME
+            </div>
+            <div class="info">
+                <label for="inputPlayerName">PLAYER NAME</label>
+                <input id="inputPlayerName" type="text" />
+            </div>
+            <div class="buttons">
+                <button id="btnStartCreateGame" class="btn">CREATE</button>
+                <div style="clear:both"></div>
+            </div>
+        </div>
+    </script>
+
+    <script id="black-canvas-host" type="text/template">
+        <div class="titleWrapper">
+            <div class="gridtitle">
+                <div class="playercount", id='t1'>
+                    1/8
+                </div>
+                <div class="title", id="t2">
+                    695420
+                </div>
+                <div class="setbutton", id='t3'>
+                    <button id="btnSettings" class="setbtn">⚙️</button>
+                    <div style="clear:both"></div>
+                </div>
+            </div>
+            <canvas class="myCanvas">
+                <p>Add suitable fallback here.</p>
+            </canvas>
+        </div>
+    </script>
+
+    <script id="black-canvas-player" type="text/template">
+        <div class="titleWrapper">
+            <div class="gridtitle">
+                <div class="playercount", id='t1'>
+                    1/8
+                </div>
+                <div class="title", id="t2">
+                    695420
+                </div>
+                <div class="playercount", id='t3'>
+                    Player
+                </div>
+            </div>
+            <canvas class="myCanvas">
+                <p>Add suitable fallback here.</p>
+            </canvas>
+        </div>
+    </script>
+
+    <script id="black-main-left" type="text/template">
+        <div class="titleWrapper">
+            <div class="title">
+                BLACKJACK 
+            </div>
+            <div class = "subtitle">
+                HOST DISBANDED LOBBY
+            </div>
+            <div class="buttons">
+                <button id="btnReturn" class="btn">MAIN MENU</button>
+                <div style="clear:both"></div>
+            </div>
+        </div>
+    </script>
+
+    <script src="./libs/jquery-3.6.0.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="./app.js" defer></script>
+  </body>
+</html>
