@@ -41,6 +41,8 @@ exports.connectedToServer = function(sio, soc){
     socket.on('requestPlayerToJoin', requestPlayerToJoin);
     // Player emits
     socket.on('playerJoinREQ', playerJoinREQ);
+    socket.on('seatChangeREQ', seatChangeREQ);
+    socket.on('readyChangeREQ', readyChangeREQ);
 }
 //Generate new lobby code for player creating new lobby
 exports.getGameId = function() {
@@ -116,3 +118,19 @@ function requestPlayerToJoin(data) {
     try {
         io.sockets.sockets.get(data.Player.mySocket).join(data.gameId.toString());  //Join Game Room
     } catch (error) {console.log(error);}}
+
+//-----------------------------------------------
+//IN GAME REQUESTS
+//-----------------------------------------------
+function seatChangeREQ(data) {
+    try {
+        let room = RoomsData.get(data.gameId);
+        io.to(room.hostSocketId.toString()).emit('seatChangeREQ', data);
+    } catch (error) {console.log(error);}
+}
+function readyChangeREQ(data) {
+    try {
+        let room = RoomsData.get(data.gameId);
+        io.to(room.hostSocketId.toString()).emit('readyChangeREQ', data);
+    } catch (error) {console.log(error);}
+}
