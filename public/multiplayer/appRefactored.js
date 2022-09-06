@@ -24,6 +24,7 @@ var GameRoomData = {
 
 //The name I have chosen for myself
 var myName = '';
+var timeSinceUpdate = 0;
 
 jQuery(function($){    
     'use strict';
@@ -151,6 +152,7 @@ jQuery(function($){
                 IO.socket.emit('playerJoinREQ', data);
             },
             gameUpdateACK : function (data) {
+                timeSinceUpdate = 0;
                 LostPlayersMap = new Map(JSON.parse(data.LostPlayers));
                 //Player is new to this game
                 if(GameRoomData.hostSocketId != data.hostSocketId) {

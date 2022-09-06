@@ -48,3 +48,43 @@ function findMe(){
     while(ind < GameRoomData.playerLimit && GameRoomData.Seats[ind].myName != myName) {ind++;}
     if(GameRoomData.Seats[ind].myName == myName) {return GameRoomData.Seats[ind];} else {return undefined;}
 }
+
+//COUNTDOWN
+let intervalID = undefined;
+//Start coundown
+function startCountdown(seconds) {
+    if(GameRoomData.timeLeft == 'NULL') {
+        GameRoomData.timeLeft = seconds;
+        if(sockets.id == GameRoomData.hostSocketId) sendGameUpdate();
+        timeSinceUpdate = 0;
+        updateCountdown();
+    }
+}
+
+//Stop countdown
+function stopCountdown() {
+    if(GameRoomData.timeLeft != 'NULL') {
+        GameRoomData.timeLeft = 'NULL';
+        clearInterval(intervalID);
+        intervalID = undefined;
+        sendGameUpdate();
+    }
+}
+
+//Update Countdown
+async function updateCountdown() {
+    if(intervalID == undefined) {
+        intervalID = setInterval(() => {
+            if(GameRoomData.timeLeft == 'NULL') {
+                clearInterval(intervalID); 
+                return;}
+            if(GameRoomData.timeLeft <= 0) {
+                GameRoomData.timeLeft = 0;
+                clearInterval(intervalID); 
+                return;}
+            GameRoomData.timeLeft = GameRoomData.timeLeft - 1;
+            timeSinceUpdate = 0;
+            sendGameUpdate();
+        }, 1000);
+    }
+}
