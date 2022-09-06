@@ -162,8 +162,9 @@ function animateFrame(timeStamp) {
     }
     FPS = 0;
     if(previousTimeStamp != timeStamp) {
-        FPS = 1000/(timeStamp - previousTimeStamp);
-        FPS = parseInt(FPS);
+        let newFPS = 1000/(timeStamp - previousTimeStamp);
+        newFPS = parseInt(newFPS);
+        FPS = FPS > newFPS ? FPS : newFPS;
         FPSText.text = FPS;
         //ANIMATION FRAMES
         //Add player list in desktop mode
@@ -190,6 +191,7 @@ function animateFrame(timeStamp) {
     ctx.fillStyle = 'rgb(' + 255 + ',' + 0 + ',' + 0 + ')';
     ctx.fillRect(curX, curY, 10, 10);
     FPSText.draw(ctx);
+
     previousTimeStamp = timeStamp;
     reqAnim = window.requestAnimationFrame(animateFrame);}
 //-----------------------------------------------------------------------------------------------
@@ -201,6 +203,25 @@ function animateFrame(timeStamp) {
 function drawWaitingScreen() {
     drawSeats(false);
     drawReadyButton();
+    let ready = true;
+    for(let i = 0; i < GameRoomData.playerLimit; i++) {
+        if(GameRoomData.Seats[i] != 'EMPTY') {
+            if(GameRoomData.Seats[i].ready == false) ready = false;}}
+    if(ready == true) {
+        if(sockets.id == GameRoomData.hostSocketId) {
+            startCountdown(10);
+        }
+    } else {
+        if(sockets.id == GameRoomData.hostSocketId) {
+            stopCountdown();
+        }
+    }
+    drawCountdown(10);
+    if(GameRoomData.timeLeft <= 0) {
+        GameRoomData.timeLeft = 'NULL';
+        GameRoomData.gameStage = 1;
+        sendGameUpdate();
+    }
 }
 
 //Draw the Betting phase of the game
@@ -253,6 +274,20 @@ function drawLeaderBoard() {
                     text.draw(ctx);
                     text2.draw(ctx);
                     playerNumber++;}}}}}
+//Draw Countdown bar at top
+function drawCountdown(beginTime) {
+    if(timeSinceUpdate <= FPS) timeSinceUpdate++;
+    if(GameRoomData.timeLeft == 'NULL') return;
+    ctx.fillStyle = 'rgb(75,75,75)';
+    ctx.fillRect(0, 0, width, height/64);
+    let G = GameRoomData.timeLeft*(205/beginTime) + 50;
+    let R = 255 - GameRoomData.timeLeft*(205/beginTime);
+    ctx.fillStyle = 'rgb('+ R + ',' + G + ',50)';
+    let secondSize = width/beginTime;
+    let barSize = (GameRoomData.timeLeft)*secondSize;
+    let extraSize = (timeSinceUpdate/FPS)*secondSize;
+    ctx.fillRect(0, 0, barSize-extraSize, height/64);
+}       
 //Draw Each Seat
 function drawSeats(started) {
     for(let i = 0; i < GameRoomData.playerLimit; i++) {
