@@ -25,9 +25,19 @@ var ratioY;
 var offsetY;
 
 //Local visual Variables
+//--------------------------------------------------------------------
+var mobileMode;
+//Waiting Buttons
 var seatButtons = new Array();
+var seatInfo = new Array(); // {myName, bank, bet}
 var readyButtonText;
 var readyButton;
+
+//Betting Screen Buttons
+// 0 = Bet, 1 = Clear, 2 = Fold, 3 = $1, 4 = $10, 5 = $100, 6 = $1000
+var bettingButtons = new Array();
+var bankText;
+var betText;
 
 //Load Image Resources
 var tableImage = new Image();
@@ -104,11 +114,15 @@ function runJavaScriptApp() {
     height = canvas.height = window.innerHeight-menu.offsetHeight;
     fontSize = getSize('FONT');
     pad = getSize('PAD');
+    if(height > width) mobileMode = true;
     updateOffset();
 
     FPSText = new ScreenText('0','255,255,255','bold', fontSize, 'Ariel', width, fontSize, width/8, 'right');
     readyButtonText =  new ScreenText('Not Ready', '255,255,255', 'bold', height/16, 'Ariel', width/2, height-height/32, width, 'center');
     readyButton =  new ScreenButton(readyButtonText, '200,50,50', 0, height-height/8, width, height/8);
+    bankText = new ScreenText('Bank: $0', '255,255,255', 'bold', fontSize/3, 'Ariel', width/8, height*(7/8)-fontSize/4, width/2, 'center');
+    betText = new ScreenText('Bet: $0', '255,255,255', 'bold', fontSize/4, 'Ariel', width/8, height*(7/8)-fontSize/2-pad, width/2, 'center');
+    createBettingButtons();
     createSeats();
 
     //-----------------------------------------------------------------------------------------------------------
@@ -137,6 +151,9 @@ function runJavaScriptApp() {
                 if(findMe().ready != true) {checkSeatButtons(true);}
                 checkReadyButton(true);
                 break;
+            case 1:
+                checkBetButtons(true);
+                break;
         }
     });
     canvas.addEventListener('mouseup', function(evt){
@@ -145,6 +162,9 @@ function runJavaScriptApp() {
             case 0:
                 if(findMe().ready != true) {checkSeatButtons(false);}
                 checkReadyButton(false);
+                break;
+            case 1:
+                checkBetButtons(false);
                 break;
         }
     });
@@ -208,30 +228,39 @@ function drawWaitingScreen() {
         if(GameRoomData.Seats[i] != 'EMPTY') {
             if(GameRoomData.Seats[i].ready == false) ready = false;}}
     if(ready == true) {
-        if(sockets.id == GameRoomData.hostSocketId) {
-            startCountdown(10);
-        }
+        if(sockets.id == GameRoomData.hostSocketId) {startCountdown(5);}
     } else {
-        if(sockets.id == GameRoomData.hostSocketId) {
-            stopCountdown();
-        }
+        if(sockets.id == GameRoomData.hostSocketId) {stopCountdown();}
     }
-    drawCountdown(10);
-    if(GameRoomData.timeLeft <= 0) {
-        GameRoomData.timeLeft = 'NULL';
-        GameRoomData.gameStage = 1;
-        sendGameUpdate();
-    }
-}
+    drawCountdown(5);
+    if(sockets.id == GameRoomData.hostSocketId) {
+        if(GameRoomData.timeLeft <= 0) {
+            GameRoomData.timeLeft = 'NULL';
+            GameRoomData.gameStage = 1;
+            unreadyEveryone();
+            sendGameUpdate();}}}
 
 //Draw the Betting phase of the game
 function drawBettingScreen() {
-
-}
+    drawSeats(true);
+    drawBettingButtons();
+    drawBankText();
+    drawCountdown(30);
+    if(sockets.id == GameRoomData.hostSocketId) {
+        if(GameRoomData.timeLeft == 'NULL') startCountdown(30);
+        let lobbyReady = true;
+        for(let i = 0; i < GameRoomData.playerLimit; i++) {
+            if(GameRoomData.Seats[i].ready == false && GameRoomData.Seats[i].fold == false) {lobbyReady = false; break;}
+        }
+        if(lobbyReady || GameRoomData.timeLeft <= 0) {
+            GameRoomData.timeLeft = 'NULL';
+            GameRoomData.gameStage = 2;
+            unreadyEveryone();
+            sendGameUpdate();}}}
 
 //Draw the Dealing phase of the game
 function drawDealingScreen() {
-
+    drawSeats(true);
 }
 
 //Draw the playing phase of the game
@@ -280,14 +309,14 @@ function drawCountdown(beginTime) {
     if(GameRoomData.timeLeft == 'NULL') return;
     ctx.fillStyle = 'rgb(75,75,75)';
     ctx.fillRect(0, 0, width, height/64);
-    let G = GameRoomData.timeLeft*(205/beginTime) + 50;
-    let R = 255 - GameRoomData.timeLeft*(205/beginTime);
-    ctx.fillStyle = 'rgb('+ R + ',' + G + ',50)';
     let secondSize = width/beginTime;
     let barSize = (GameRoomData.timeLeft)*secondSize;
     let extraSize = (timeSinceUpdate/FPS)*secondSize;
+    let c = getBarColor(barSize-extraSize);
+    ctx.fillStyle = 'rgb('+ c.r + ',' + c.g + ',50)';
     ctx.fillRect(0, 0, barSize-extraSize, height/64);
-}       
+}
+
 //Draw Each Seat
 function drawSeats(started) {
     for(let i = 0; i < GameRoomData.playerLimit; i++) {
@@ -300,6 +329,7 @@ function drawSeats(started) {
         }
         seatButtons[i].draw(ctx);
     }
+    drawSeatInfo();
 }
 
 //Create array of seats
@@ -319,10 +349,8 @@ function checkSeatButtons(isClicked) {
     for(let i = 0; i < GameRoomData.playerLimit; i++) {
         if(seatButtons[i].clicked(curX, curY)) {
                 seatButtons[i].isClicked = isClicked;
-                if(GameRoomData.Seats[i] == 'EMPTY') {
-                    let player = findMe();
-                    let data = {gameId:GameRoomData.gameId, player : player, seat: i}
-                    sockets.emit('seatChangeREQ', data);
+                if(GameRoomData.Seats[i] == 'EMPTY' && isClicked) {
+                    sendUserData('seatChangeREQ', i);
                 }
         } else {seatButtons[i].isClicked = false;}
     }
@@ -333,9 +361,7 @@ function checkReadyButton(isClicked) {
     if(isClicked == true) {
         if(readyButton.clicked(curX,curY)) {
             readyButton.isClicked = isClicked;
-            let player = findMe();
-            let data = {gameId:GameRoomData.gameId, player : player}
-            sockets.emit('readyChangeREQ', data);
+            sendUserData('readyChangeREQ');
         }
     } else {readyButton.isClicked = false;}
 }
@@ -353,7 +379,76 @@ function drawReadyButton() {
     readyButton.draw(ctx);
 }
 
+//Make betting buttons
+function createBettingButtons() {
+    let bLoc = {x: 0, y: height*(7/8), xs: width/4, ys: height/8}
+    let bText = new ScreenText('Bet','255,255,255', 'bold', fontSize, 'Ariel', bLoc.x+(bLoc.xs/2), bLoc.y+(bLoc.ys/2)+fontSize/2, bLoc.xs, 'center');
+    bettingButtons[0] = new ScreenButton(bText, '50,255,50', bLoc.x, bLoc.y, bLoc.xs, bLoc.ys);
+    bLoc = {x: width/4, y: height*(7/8), xs: width/2, ys: height/8}
+    bText = new ScreenText('Clear','255,255,255', 'bold', fontSize, 'Ariel', bLoc.x+(bLoc.xs/2), bLoc.y+(bLoc.ys/2)+fontSize/2, bLoc.xs, 'center');
+    bettingButtons[1] = new ScreenButton(bText, '255,50,50', bLoc.x, bLoc.y, bLoc.xs, bLoc.ys);
+    bLoc = {x: width*(3/4), y: height*(7/8), xs: width/4, ys: height/8}
+    bText = new ScreenText('Fold','255,255,255', 'bold', fontSize, 'Ariel', bLoc.x+(bLoc.xs/2), bLoc.y+(bLoc.ys/2)+fontSize/2, bLoc.xs, 'center');
+    bettingButtons[2] = new ScreenButton(bText, '255,255,50', bLoc.x, bLoc.y, bLoc.xs, bLoc.ys);
+    let xM = mobileMode ? width*(1/4): width*(3/4);
+    for(let i = 3; i < 7; i++) {
+        bLoc = {x: xM, y: height-(height/8)*(i-1)-pad*(i-2), xs: width/(mobileMode?2:4), ys: height/8}
+        bText = new ScreenText('$' + Math.pow(10,(i-3)),'255,255,255', 'bold', fontSize, 'Ariel', bLoc.x+(bLoc.xs/2), bLoc.y+(bLoc.ys/2)+fontSize/2, bLoc.xs, 'center');
+        bettingButtons[i] = new ScreenButton(bText, '255,125,50', bLoc.x, bLoc.y, bLoc.xs, bLoc.ys);
+    }
+}
+
+//Draw Betting Buttons
+function drawBettingButtons() {
+    let myself = findMe();
+    if(myself.ready == false && myself.fold == false) {
+        for(let i = 0; i < bettingButtons.length; i++) {
+            bettingButtons[i].draw(ctx);
+    }
+}}
+
+//Draw Bet and Bank Text
+function drawBankText() {
+    let myself = findMe();
+    if(myself.ready == false && myself.fold == false) {
+        betText.text = "Bet: $" + myself.bet;
+        bankText.text = "Bank: $" + myself.bank;
+        betText.draw(ctx);
+        bankText.draw(ctx);
+    }
+}
+
+//Check Bet Buttons
+function checkBetButtons(isClicked) {
+    let myself = findMe();
+    if(myself.ready == false && myself.fold == false) {
+        for(let i = 0; i < bettingButtons.length; i++) {
+            if(bettingButtons[i].clicked(curX, curY)) {
+                bettingButtons[i].isClicked = isClicked;
+                if(isClicked) sendUserData('betChangeREQ', bettingButtons[i].screenText.text);}
+            if(!isClicked) bettingButtons[i].isClicked = false;
+}}}
+
+//Player info on each seat
+function drawSeatInfo() {
+    for(let i = 0; i < GameRoomData.playerLimit; i++) {
+        if(GameRoomData.Seats[i] != 'EMPTY') {
+            let gL = getLocation('SEATNAME', i);
+            let alignT = i >= GameRoomData.playerLimit/2 ? 'left' : 'right'
+            let seatName = new ScreenText(GameRoomData.Seats[i].myName,'255,255,255', 'bold', fontSize/4, 'Ariel', gL.x, gL.y, getSize('SEATBUTTON')*1.5, alignT);
+            gL = getLocation('SEATBANK', i);
+            let seatBank = new ScreenText('Bank: $' + GameRoomData.Seats[i].bank,'255,255,255', 'bold', fontSize/4, 'Ariel', gL.x, gL.y, getSize('SEATBUTTON')*1.5, alignT);
+            gL = getLocation('SEATBET', i);
+            let seatBet = new ScreenText('Bet: $' + GameRoomData.Seats[i].bet,'255,255,255', 'bold', fontSize/4, 'Ariel', gL.x, gL.y, getSize('SEATBUTTON')*1.5, alignT);
+            seatName.draw(ctx);
+            seatBank.draw(ctx);
+            seatBet.draw(ctx);
+        }
+    }
+}
+
 //Create Pixelated Image
 function make_image(base_image, xwidth, yheight, xSize, ySize, ctx) {
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(base_image, xwidth, yheight, xSize, ySize);}
+

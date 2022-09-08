@@ -55,6 +55,7 @@ jQuery(function($){
             IO.socket.on('playerLeft', App.Host.playerLeft); //A player has left the lobby
             IO.socket.on('seatChangeREQ', App.Host.seatChangeREQ); //A player is trying to change seats
             IO.socket.on('readyChangeREQ', App.Host.readyChangeREQ); //A player is trying to ready or unready
+            IO.socket.on('betChangeREQ', App.Host.betChangeREQ); //A player is trying to ready or unready
             //Player Events
             IO.socket.on('gameUpdateACK', App.Player.gameUpdateACK); //Used for any game update during the game
             IO.socket.on('hostLeft', App.Player.hostLeft);  //The host left, remove everyone
@@ -109,7 +110,7 @@ jQuery(function($){
                 document.getElementById("t2").innerHTML = GameRoomData.gameId;  //Add gameId to top bar
                 document.getElementById("t1").innerHTML = GameRoomData.playerCount + '/' + GameRoomData.playerLimit;    //Add playercount to top bar
                 initSeats();
-                updatePlayer(myName, [], sockets.id, 0, 0, false, false, 'NULL', 0);
+                updatePlayer(myName, [], sockets.id, 2000, 0, false, false, 'NULL', 0);
                 GameRoomData.hostSocketId = sockets.id;
                 runJavaScriptApp();
             } else {console.log("Failed to join game");}
@@ -152,7 +153,7 @@ jQuery(function($){
                 IO.socket.emit('playerJoinREQ', data);
             },
             gameUpdateACK : function (data) {
-                timeSinceUpdate = 0;
+                if(GameRoomData.timeLeft !=  data.timeLeft) timeSinceUpdate = 0;
                 LostPlayersMap = new Map(JSON.parse(data.LostPlayers));
                 //Player is new to this game
                 if(GameRoomData.hostSocketId != data.hostSocketId) {
@@ -224,7 +225,7 @@ jQuery(function($){
                     while(GameRoomData.Seats[ind] != 'EMPTY' && ind < GameRoomData.playerLimit) {ind++;}
                     if(GameRoomData.Seats[ind] != 'EMPTY') {console.log('Unable to find empty seat!'); return;}
                     //Empty seat is available
-                    updatePlayer(data.name, [], data.socketId, 0, 0, false, false, 'NULL', ind);
+                    updatePlayer(data.name, [], data.socketId, 2000, 0, false, false, 'NULL', ind);
                 }
                 GameRoomData.playerCount++;
                 requestPlayerToJoin(ind);
@@ -241,10 +242,10 @@ jQuery(function($){
                 }
             },
             seatChangeREQ : function (data) {
-                if(GameRoomData.Seats[data.seat] == 'EMPTY') {
-                    GameRoomData.Seats[data.seat] = GameRoomData.Seats[data.player.seat];
+                if(GameRoomData.Seats[data.updateData] == 'EMPTY') {
+                    GameRoomData.Seats[data.updateData] = GameRoomData.Seats[data.player.seat];
                     GameRoomData.Seats[data.player.seat] = 'EMPTY';
-                    GameRoomData.Seats[data.seat].seat = data.seat;
+                    GameRoomData.Seats[data.updateData].seat = data.updateData;
                     sendGameUpdate();
                 }
             },
@@ -255,6 +256,33 @@ jQuery(function($){
                     GameRoomData.Seats[data.player.seat].ready = true;
                 }
                 sendGameUpdate();
+            },
+            betChangeREQ : function (data) {
+                let thePlayer = GameRoomData.Seats[data.player.seat];
+                switch(data.updateData) {
+                    case 'Bet':
+                        thePlayer.ready = true; thePlayer.fold = false; sendGameUpdate();
+                        break;
+                    case 'Clear':
+                        thePlayer.bank = thePlayer.bank + thePlayer.bet; thePlayer.bet = 0; sendGameUpdate();
+                        break;
+                    case 'Fold':
+                        thePlayer.bank = thePlayer.bank + thePlayer.bet; thePlayer.bet = 0;
+                        thePlayer.ready = false; thePlayer.fold = true; sendGameUpdate();
+                        break;
+                    case '$1':
+                        if(thePlayer.bank >= 1) {thePlayer.bank = thePlayer.bank - 1; thePlayer.bet = thePlayer.bet + 1; sendGameUpdate();}
+                        break;
+                    case '$10':
+                        if(thePlayer.bank >= 10) {thePlayer.bank = thePlayer.bank - 10; thePlayer.bet = thePlayer.bet + 10; sendGameUpdate();}
+                        break;
+                    case '$100':
+                        if(thePlayer.bank >= 100) {thePlayer.bank = thePlayer.bank - 100; thePlayer.bet = thePlayer.bet + 100; sendGameUpdate();}
+                        break;
+                    case '$1000':
+                        if(thePlayer.bank >= 1000) {thePlayer.bank = thePlayer.bank - 1000; thePlayer.bet = thePlayer.bet + 1000; sendGameUpdate();}
+                        break;
+                }
             }
         }
     };
@@ -330,3 +358,11 @@ jQuery(function($){
     timeElapsed = 0;
     FPS = 0;
  }
+
+ //Send Data Packet
+function sendUserData(requestName, updateData) {
+    let player = findMe();
+    let data = {gameId: GameRoomData.gameId, player: player, updateData: updateData}
+    let transmitData = {req: requestName, pack: data}
+    sockets.emit('gameChangeREQ', transmitData);
+}

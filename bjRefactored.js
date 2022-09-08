@@ -41,8 +41,7 @@ exports.connectedToServer = function(sio, soc){
     socket.on('requestPlayerToJoin', requestPlayerToJoin);
     // Player emits
     socket.on('playerJoinREQ', playerJoinREQ);
-    socket.on('seatChangeREQ', seatChangeREQ);
-    socket.on('readyChangeREQ', readyChangeREQ);
+    socket.on('gameChangeREQ', gameChangeREQ);
 }
 //Generate new lobby code for player creating new lobby
 exports.getGameId = function() {
@@ -71,9 +70,9 @@ exports.getGame = function(gameId) {
 exports.createGame = function(gameId, mySocket) {
     try {
         let roomData = RoomsData.get(gameId.toString());
-        let R = Math.floor(Math.random() * 255);
-        let G = Math.floor(Math.random() * 255);
-        let B = Math.floor(Math.random() * 255);
+        let R = Math.floor(Math.random() * 50);
+        let G = Math.floor(Math.random() * 50);
+        let B = Math.floor(Math.random() * 50);
         let randColor = R + ',' + G + ',' + B;
         roomData.color = randColor;
         roomData.hostSocketId = mySocket;
@@ -122,15 +121,9 @@ function requestPlayerToJoin(data) {
 //-----------------------------------------------
 //IN GAME REQUESTS
 //-----------------------------------------------
-function seatChangeREQ(data) {
+function gameChangeREQ(data) {
     try {
-        let room = RoomsData.get(data.gameId);
-        io.to(room.hostSocketId.toString()).emit('seatChangeREQ', data);
-    } catch (error) {console.log(error);}
-}
-function readyChangeREQ(data) {
-    try {
-        let room = RoomsData.get(data.gameId);
-        io.to(room.hostSocketId.toString()).emit('readyChangeREQ', data);
+        let room = RoomsData.get(data.pack.gameId);
+        io.to(room.hostSocketId.toString()).emit(data.req, data.pack);
     } catch (error) {console.log(error);}
 }

@@ -29,6 +29,18 @@ function getLocation(typeFor, data) {
     } else if (typeFor == 'SEATTEXT') {
         let buttonLoc = getLocation('SEATBUTTON', data);
         loc = {x: buttonLoc.x+getSize('SEATBUTTON')/2, y: buttonLoc.y+getSize('SEATBUTTON')-fontSize/8} 
+    } else if (typeFor == 'SEATNAME') {
+        let buttonLoc = getLocation('SEATBUTTON', data);
+        let extraX = data >= GameRoomData.playerLimit/2 ? 0 : getSize('SEATBUTTON');
+        loc = {x: buttonLoc.x + extraX, y: buttonLoc.y} 
+    } else if (typeFor == 'SEATBANK') {
+        let buttonLoc = getLocation('SEATBUTTON', data);
+        let extraX = data >= GameRoomData.playerLimit/2 ? 0 : getSize('SEATBUTTON');
+        loc = {x: buttonLoc.x + extraX, y: buttonLoc.y+getSize('SEATBUTTON')+fontSize/4} 
+    } else if (typeFor == 'SEATBET') {
+        let buttonLoc = getLocation('SEATBUTTON', data);
+        let extraX = data >= GameRoomData.playerLimit/2 ? getSize('SEATBUTTON') : 0;
+        loc = {x: buttonLoc.x + extraX, y: buttonLoc.y + getSize('SEATBUTTON')/2+fontSize/8} 
     }
     return loc;
 }
@@ -88,3 +100,21 @@ async function updateCountdown() {
         }, 1000);
     }
 }
+
+//Get current countdown bar color
+function getBarColor(smoothTime) {
+    let color = {r: 0, g: 0, b: 0}
+    let G = (smoothTime/width)*255;
+    let R = 255 - (smoothTime/width)*255;
+    color.g = G > 255 ? 255 : G;
+    color.r = R < 0 ? 0 : R;
+    return color;
+}
+
+//Unready everyone in lobby
+function unreadyEveryone() {
+    if(sockets.id != GameRoomData.hostSocketId) {return;}
+    for(let i = 0; i < GameRoomData.playerLimit; i++) {
+        if(GameRoomData.Seats[i] != 'EMPTY') {
+            if(GameRoomData.Seats[i].fold == false) {
+                GameRoomData.Seats[i].ready = false;}}}}
