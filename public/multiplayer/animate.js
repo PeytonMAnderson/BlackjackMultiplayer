@@ -103,6 +103,81 @@ class ScreenButton extends ScreenText {
         if(cursorX >= this.x && cursorX <= this.x2) {
             if(cursorY >= this.y && cursorY <= this.y2) {return true;}} return false;}}
 
+class Card {
+    constructor(posX, posY, cardIndexValue, face, isBig, rotate) {
+        this.cardIndexValue = cardIndexValue;
+        this.face = face;
+        this.x = posX;
+        this.y = posY;
+        this.rad = rotate;
+        this.big = isBig;
+        this.animating = false;
+        this.animStart = 0;
+        this.animEnd = 0;}
+    //Methods
+    flip() {if(this.face == 'FRONT') {this.face = 'BACK';} else {this.face = 'FRONT';}}
+    calcSuite() {
+        if(this.cardIndexValue >= 1 && this.cardIndexValue <= 13)   return "Clubs";
+        if(this.cardIndexValue >= 14 && this.cardIndexValue <= 26)  return "Spades";
+        if(this.cardIndexValue >= 27 && this.cardIndexValue <= 39)  return "Hearts";
+        if(this.cardIndexValue >= 40 && this.cardIndexValue <= 52)  return "Diamonds";}
+    calcValue() {
+        if(this.cardIndexValue >= 1 && this.cardIndexValue <= 13)   return this.cardIndexValue;
+        if(this.cardIndexValue >= 14 && this.cardIndexValue <= 26)  return this.cardIndexValue-13;
+        if(this.cardIndexValue >= 27 && this.cardIndexValue <= 39)  return this.cardIndexValue-26;
+        if(this.cardIndexValue >= 40 && this.cardIndexValue <= 52)  return this.cardIndexValue-39;}
+    calcFaceValue() {
+        let crudeValue = this.calcValue(this.cardIndexValue);
+        if(crudeValue >= 1 && crudeValue <= 9) {crudeValue++;   return crudeValue;}
+        if(crudeValue == 10)    return "J";
+        if(crudeValue == 11)    return "Q";
+        if(crudeValue == 12)    return "K";
+        if(crudeValue == 13)    return "A";}
+    buildCard(ctx, rotate) {
+        if(rotate == true) {rotateCardAndDraw(this.x, this.y, this.rad, this);} else {
+            let thisCardSize = cardSize;
+            if(this.big == false) {thisCardSize = cardSize/2;}
+            if(this.face == 'BACK') {make_image(cardBack, this.x, this.y, thisCardSize, thisCardSize*1.5, ctx);}
+            if(this.face == 'FRONT') {
+                make_image(cardFront, this.x, this.y, thisCardSize, thisCardSize*1.5, ctx);
+                let cardSuite = this.calcSuite(this.cardIndexValue);
+                let cardValue = this.calcFaceValue(this.cardIndexValue);
+                if(cardValue != undefined) {
+                    if (cardSuite == "Hearts" || cardSuite == "Diamonds") {
+                    ctx.fillStyle = 'rgb(255,0,0)';
+                    ctx.font = "italic bold " + thisCardSize*0.5 + "pt Tahoma";
+                    ctx.textAlign = 'center';
+                    ctx.fillText(cardValue, this.x+thisCardSize/2, this.y+thisCardSize/2, thisCardSize);
+                    if(cardSuite == "Hearts") {make_image(heartImage, this.x, this.y+(thisCardSize*0.5), thisCardSize, thisCardSize, ctx);}
+                    if(cardSuite == "Diamonds") {make_image(diamondImage, this.x, this.y+(thisCardSize*0.5), thisCardSize, thisCardSize, ctx);}
+                    } else {
+                    ctx.fillStyle = 'rgb(0,0,0)';
+                    ctx.font = "italic bold " + thisCardSize*0.5 + "pt Tahoma";
+                    ctx.textAlign = 'center';
+                    ctx.fillText(cardValue, this.x+thisCardSize/2, this.y+thisCardSize/2, thisCardSize);
+                    if(cardSuite == "Spades") {make_image(spadeImage, this.x, this.y+(thisCardSize*0.5), thisCardSize, thisCardSize, ctx);}
+                    if(cardSuite == "Clubs") {make_image(clubImage, this.x, this.y+(thisCardSize*0.5), thisCardSize, thisCardSize, ctx);}
+                    }} else {ctx.fillStyle = 'rgb(0,0,0)';  ctx.fillRect(this.x-1, this.y-1, thisCardSize+2, thisCardSize*1.5+2);}}}}
+    animateCardTo(desX, desY, time, ctx) {
+        if(this.animStart == 0) {
+            this.animating = true;
+            this.animStart = timeElapsed;
+            this.animEnd = this.animStart + time;}
+        if(timeElapsed < this.animEnd) {
+            //Continue Animations
+            this.animating = true;
+            let vx = 2 * (desX - this.x) / ((time*(FPS/1000))/4);
+            let vy = 2 * (desY - this.y) / ((time*(FPS/1000))/4);
+            this.x = this.x+vx;
+            this.y = this.y+vy;
+            if(this.rad == 0) {this.buildCard(ctx, false);} else {this.buildCard(ctx, true);}
+        } else if (timeElapsed > this.animEnd) {
+            if(this.x != desX || this.y != desY) {this.x = desX;    this.y = desY;}
+            this.animating = false;
+            this.animStart = 0;
+            this.animEnd = 0;}}}
+            
+
 function runJavaScriptApp() {
     //-----------------------------------------------------------------------------------------------------------
     //INITIALIZE DEPENDANCIES
@@ -255,6 +330,7 @@ function drawBettingScreen() {
         if(lobbyReady || GameRoomData.timeLeft <= 0) {
             GameRoomData.timeLeft = 'NULL';
             GameRoomData.gameStage = 2;
+            autoFold();
             unreadyEveryone();
             sendGameUpdate();}}}
 

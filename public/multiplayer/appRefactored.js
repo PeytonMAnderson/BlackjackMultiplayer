@@ -58,6 +58,7 @@ jQuery(function($){
             IO.socket.on('betChangeREQ', App.Host.betChangeREQ); //A player is trying to ready or unready
             //Player Events
             IO.socket.on('gameUpdateACK', App.Player.gameUpdateACK); //Used for any game update during the game
+            IO.socket.on('newCardACK', App.Player.newCardACK);
             IO.socket.on('hostLeft', App.Player.hostLeft);  //The host left, remove everyone
         },
         //#5 Socket Connected, attempt to join or create new room using game code
@@ -178,6 +179,12 @@ jQuery(function($){
                 document.getElementById("t3").innerHTML = myName;   //Add name to top bar
                 document.getElementById("t2").innerHTML = GameRoomData.gameId;  //Add gameId to top bar
                 document.getElementById("t1").innerHTML = GameRoomData.playerCount + '/' + GameRoomData.playerLimit;    //Add playercount to top bar
+            },
+            newCardACK : function (data) {
+                if(data.dealersFirst) {
+                } else {
+                    GameRoomData.Seats[data.player.seat] = data.player;
+                }
             },
             hostLeft : function () {
                 App.$gameArea.html(App.$templateReturn);

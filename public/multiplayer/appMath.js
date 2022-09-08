@@ -118,3 +118,10 @@ function unreadyEveryone() {
         if(GameRoomData.Seats[i] != 'EMPTY') {
             if(GameRoomData.Seats[i].fold == false) {
                 GameRoomData.Seats[i].ready = false;}}}}
+
+//Fold everyone that has not bet
+function autoFold() {
+    if(sockets.id != GameRoomData.hostSocketId) {return;}
+    for(let i = 0; i < GameRoomData.playerLimit; i++) {
+        if(GameRoomData.Seats[i] != 'EMPTY') {
+            if(GameRoomData.Seats[i].bet = 0) {GameRoomData.Seats[i].fold = true;}}}}
