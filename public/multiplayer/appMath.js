@@ -6,6 +6,7 @@ function getSize(typeFor) {
     } else if(typeFor == 'SEATBUTTON') {size = height/16;
     } else if(typeFor == 'TABLEX') {if(width > height/2) {size = height/2;} else if(width < height/2) {size = width;} else {size = width;}
     } else if(typeFor == 'TABLEY') {if(width > height/2) {size = height} else if(width < width*2) {size = width;} else {size = height;}
+    } else if(typeFor == 'CARDSIZE') {if(width < height/2) {size = width/(100/18);} else {size = height/(200/18);}
     }
     return size;}
 
@@ -41,6 +42,16 @@ function getLocation(typeFor, data) {
         let buttonLoc = getLocation('SEATBUTTON', data);
         let extraX = data >= GameRoomData.playerLimit/2 ? getSize('SEATBUTTON') : 0;
         loc = {x: buttonLoc.x + extraX, y: buttonLoc.y + getSize('SEATBUTTON')/2+fontSize/8} 
+    } else if (typeFor == 'CARDORIGIN') {
+        if(width > height/2)      {loc = {x: width/2-height/4+height*(4/200), y: height*(4/200)}}
+        else if(width < height/2) {loc = {x: width*(4/100), y: height/2-width+width*(4/100)}}
+        else                      {loc = {x: height*(4/200), y: height*(4/200)}}
+    } else if (typeFor == 'DEALERCARDS') {
+        {loc = {x: 0, y: height/16 * data}}
+    } else if (typeFor == 'BIGCARDS') {
+        {loc = {x: width/4, y: height/16 * data}}
+    } else if (typeFor == 'SMALLCARDS') {
+        {loc = {x: width/2, y: height/16 * data}}
     }
     return loc;
 }

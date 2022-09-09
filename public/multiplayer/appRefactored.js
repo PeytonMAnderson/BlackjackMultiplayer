@@ -181,10 +181,14 @@ jQuery(function($){
                 document.getElementById("t1").innerHTML = GameRoomData.playerCount + '/' + GameRoomData.playerLimit;    //Add playercount to top bar
             },
             newCardACK : function (data) {
-                if(data.dealersFirst) {
-                } else {
-                    GameRoomData.Seats[data.player.seat] = data.player;
-                }
+                // {holderType: cardHolder: deckI: }
+                if(getCardAmount() != data.deckI-1) rebuildCards();
+                if(data.holderType == 'DEALER') {
+                    GameRoomData.DealerHand = data.cardHolder;
+                } else if (data.holderType == 'PLAYER'){
+                    GameRoomData.Seats[data.cardHolder.seat] = data.cardHolder;
+                } else {return;}
+                addNewCard(data);
             },
             hostLeft : function () {
                 App.$gameArea.html(App.$templateReturn);

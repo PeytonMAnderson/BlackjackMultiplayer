@@ -55,6 +55,12 @@ heartImage.src = window.location.protocol+'//'+window.location.host+'/textures/h
 var diamondImage = new Image();
 diamondImage.src = window.location.protocol+'//'+window.location.host+'/textures/diamond.png';
 
+//Local Cards
+var cardArray = new Array();
+var cardOrigin;
+var cardSize = 0;
+var cardTime = 0;
+
 //Controls elements of text on screen
 class ScreenText {
     constructor(Text, color, format, fontS, font, posX, posY, maxWidth, Alignment) {
@@ -104,6 +110,76 @@ class ScreenButton extends ScreenText {
             if(cursorY >= this.y && cursorY <= this.y2) {return true;}} return false;}}
 
 class Card {
+    constructor(X, Y, cardValue, face, isBig, OrgX, OrgY, rotation) {
+        this.cardValue = cardValue;
+        this.xf = X;
+        this.yf = Y;
+        this.x = OrgX;
+        this.y = OrgY;
+        this.size = isBig ? cardSize : cardSize/2;
+        this.face = face;
+        this.animating = (this.x != this.xf || this.y != this.yf);
+        this.rotate = rotation;
+    }
+    calcSuite() {
+        if(this.cardValue >= 0 && this.cardValue <= 12)   return "club";
+        if(this.cardValue >= 13 && this.cardValue <= 25)  return "spade";
+        if(this.cardValue >= 26 && this.cardValue <= 38)  return "heart";
+        if(this.cardValue >= 39 && this.cardValue <= 51)  return "diamond";
+    }
+    calcValue() {return this.cardValue % 13;}
+    calcFaceValue() {
+        let crudeValue = this.calcValue();
+        if(crudeValue >= 1 && crudeValue <= 9) {crudeValue++;   return crudeValue;}
+        if(crudeValue == 10)    return "J";
+        if(crudeValue == 11)    return "Q";
+        if(crudeValue == 12)    return "K";
+        if(crudeValue == 0)    return "A";}
+    draw(ctx) {
+        let thisX = this.x;
+        let thisY = this.y;
+        if(this.rotate != 0) {
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            ctx.rotate((this.rotate)*Math.PI/180);
+            thisX = 0;  thisY = 0;
+        }
+        if(this.face == 'FRONT') {
+            make_image(cardFront, thisX, thisY, this.size, this.size*1.5, ctx);
+            let suite = this.calcSuite();
+            let value = this.calcFaceValue();
+            let cardIcon;
+            if(suite == 'diamond' || suite == 'heart') {
+                ctx.fillStyle = 'rgb(255,0,0)';
+                if(suite == 'diamond') {cardIcon = diamondImage;} else {cardIcon = heartImage;}} else {
+                ctx.fillStyle = 'rgb(0,0,0)';
+                if(suite == 'spade') {cardIcon = spadeImage;} else {cardIcon = clubImage;}}
+            ctx.font = "italic bold " + this.size*0.5 + "pt Ariel";
+            ctx.textAlign = 'center';
+            ctx.fillText(value, thisX+this.size/2, thisY+this.size/2, this.size);
+            make_image(cardIcon, thisX, thisY+(this.size*0.5), this.size, this.size, ctx);
+        } else if(this.face == 'BACK') {make_image(cardBack, thisX, thisY, this.size, this.size*1.5, ctx); }
+        if(this.rotate != 0) {ctx.restore();}
+    }
+    animate(ctx, time) {
+        if(this.animating == true) {
+            const vx = (this.xf - this.x) / ((time/1000)*143/4);
+            const vy = (this.yf - this.y) / ((time/1000)*143/4);
+            //If animation passed stop point
+            if(this.xf == this.x && this.yf == this.y || Math.abs(vx) < 0.001 && Math.abs(vy) < 0.001) {
+                this.x = this.xf;
+                this.y = this.yf;
+                this.animating = false;
+            } else {
+                this.x = this.x+vx;
+                this.y = this.y+vy;
+            }
+        }
+        this.draw(ctx);
+    }
+}
+
+class OldCard {
     constructor(posX, posY, cardIndexValue, face, isBig, rotate) {
         this.cardIndexValue = cardIndexValue;
         this.face = face;
@@ -190,6 +266,8 @@ function runJavaScriptApp() {
     fontSize = getSize('FONT');
     pad = getSize('PAD');
     if(height > width) mobileMode = true;
+    cardOrigin = getLocation('CARDORIGIN');
+    cardSize = getSize('CARDSIZE');
     updateOffset();
 
     FPSText = new ScreenText('0','255,255,255','bold', fontSize, 'Ariel', width, fontSize, width/8, 'right');
@@ -244,6 +322,7 @@ function runJavaScriptApp() {
         }
     });
     //Start Game
+    startTimer = true;
     window.requestAnimationFrame(animateFrame);
 }
 
@@ -337,6 +416,23 @@ function drawBettingScreen() {
 //Draw the Dealing phase of the game
 function drawDealingScreen() {
     drawSeats(true);
+    drawCards();
+    if(GameRoomData.hostSocketId == sockets.id) {
+        for(let i = 0; i < (GameRoomData.playerLimit+1)*4; i++) {
+            if(i < (GameRoomData.playerLimit+1)*2) {
+                if(cardTime == i*144) {
+                    let data = {gameId: GameRoomData.gameId, holderType:'PLAYER', cardHolder: GameRoomData.Seats[0]}
+                    sockets.emit('getNewCardACK', data);
+                }
+            } else {
+                if(cardTime == i*144) {
+                    let data = {gameId: GameRoomData.gameId, holderType:'DEALER', cardHolder: GameRoomData.DealerHand}
+                    sockets.emit('getNewCardACK', data);
+                }
+            }
+        }
+        cardTime++;
+    }
 }
 
 //Draw the playing phase of the game
@@ -523,6 +619,95 @@ function drawSeatInfo() {
     }
 }
 
+//Draw Cards in game
+function drawCards() {
+    for(let i = 0; i < cardArray.length; i++) {
+        cardArray[i].card.animate(ctx, 1000);
+    }
+}
+
+//Rebuild cards in array is empty or corrupted
+function rebuildCards() {
+    cardArray = [];
+    //Little Cards
+    for(let i = 0; i < GameRoomData.playerLimit; i++) {
+        if(GameRoomData.Seats[i] != 'EMPTY') {
+            for(let k = 0; k < GameRoomData.Seats[i].myHand.length; k++) {
+                // {type: card:}
+                cardArray[cardArray.length] = {type: 'SMALL', card: {}}
+                let loc = getLocation('SMALLCARDS', k);
+                cardArray[cardArray.length-1].card = new Card(loc.x, loc.y, GameRoomData.Seats[i].myHand[k], 'FRONT', false, loc.x, loc.y, 90);
+            }
+        }
+    }
+    //Dealer Cards
+    for(let i = 0; i < GameRoomData.DealerHand.length; i++) {
+        cardArray[cardArray.length] = {type: 'DEALER', card: {}}
+        let loc = getLocation('DEALERCARDS', i);
+        cardArray[cardArray.length-1].card = new Card(loc.x, loc.y, GameRoomData.DealerHand[i], (i==1)?'BACK':'FRONT', true, loc.x, loc.y, 0);
+    }
+    //My Cards
+    let myself = findMe();
+    for(let i = 0; i < myself.myHand.length; i++) {
+        cardArray[cardArray.length] = {type: 'BIG', card: {}}
+        let loc = getLocation('BIGCARDS', i);
+        cardArray[cardArray.length-1].card = new Card(loc.x, loc.y, myself.myHand[i], 'FRONT', true, loc.x, loc.y, 0);
+    }
+}
+
+//Get card amount
+function getCardAmount() {
+    let count = 0;
+    for(let i = 0; i < cardArray.length; i++) {
+        if(cardArray[i].type == 'SMALL' || cardArray[i].type == 'DEALER') count++;
+    }
+    return count;
+}
+
+//Add new card to cardArray
+function addNewCard(data) {
+    //holderType, cardHolder
+    let replaceI = cardArray.length;
+    if(data.holderType == 'DEALER') {
+        // SMALL -> DEALER -> BIG
+        cardArray[replaceI] = {type: 'DEALER', card: {}}
+        let loc = getLocation('DEALERCARDS', data.cardHolder.length-1);
+        cardArray[replaceI].card = new Card(loc.x, loc.y, data.cardHolder[data.cardHolder.length-1], (data.cardHolder.length==2)?'BACK':'FRONT', true, cardOrigin.x, cardOrigin.y, 0);
+        sinkDownCard(replaceI, 'DEALER');
+    } else if (data.holderType == 'PLAYER') {
+        let myself = findMe();
+        if(myself == data.cardHolder) {
+            cardArray[replaceI] = {type: 'BIG', card: {}}
+            let loc = getLocation('BIGCARDS', data.cardHolder.myHand.length-1);
+            cardArray[replaceI].card = new Card(loc.x, loc.y, data.cardHolder.myHand[data.cardHolder.myHand.length-1], 'FRONT', true, cardOrigin.x, cardOrigin.y, 0);
+        }
+        cardArray[replaceI+1] = {type: 'SMALL', card: {}}
+        let loc = getLocation('SMALLCARDS', data.cardHolder.myHand.length-1);
+        cardArray[replaceI+1].card = new Card(loc.x, loc.y, data.cardHolder.myHand[data.cardHolder.myHand.length-1], 'FRONT', false, cardOrigin.x, cardOrigin.y, 90);
+        sinkDownCard(replaceI+1, 'SMALL');
+    }
+}
+
+//Sink card down to its location
+function sinkDownCard(replaceIndex, replaceType) {
+    if(cardArray.length > 1) {
+        let j = replaceIndex;
+        while(j > 0 && cardArray[j-1].type == 'BIG') {
+            const temp = cardArray[j];
+            cardArray[j] = cardArray[j-1];
+            cardArray[j-1] = temp;
+            j--;
+        }
+        if(replaceType == 'SMALL') {
+            while(j > 0 && cardArray[j-1].type == 'SMALL') {
+                const temp = cardArray[j];
+                cardArray[j] = cardArray[j-1];
+                cardArray[j-1] = temp;
+                j--;
+            }
+        }
+    }
+}
 //Create Pixelated Image
 function make_image(base_image, xwidth, yheight, xSize, ySize, ctx) {
     ctx.imageSmoothingEnabled = false;
