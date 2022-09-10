@@ -55,7 +55,8 @@ jQuery(function($){
             IO.socket.on('playerLeft', App.Host.playerLeft); //A player has left the lobby
             IO.socket.on('seatChangeREQ', App.Host.seatChangeREQ); //A player is trying to change seats
             IO.socket.on('readyChangeREQ', App.Host.readyChangeREQ); //A player is trying to ready or unready
-            IO.socket.on('betChangeREQ', App.Host.betChangeREQ); //A player is trying to ready or unready
+            IO.socket.on('betChangeREQ', App.Host.betChangeREQ); //A player is trying change their bet
+            IO.socket.on('playChangeREQ', App.Host.playChangeREQ);
             //Player Events
             IO.socket.on('gameUpdateACK', App.Player.gameUpdateACK); //Used for any game update during the game
             IO.socket.on('newCardACK', App.Player.newCardACK);
@@ -190,6 +191,7 @@ jQuery(function($){
                     GameRoomData.Seats[data.cardHolder.seat] = data.cardHolder;
                 } else {return;}
                 addNewCard(data);
+                recLatestCard = true;
             },
             hostLeft : function () {
                 App.$gameArea.html(App.$templateReturn);
@@ -293,6 +295,30 @@ jQuery(function($){
                         break;
                     case '$1000':
                         if(thePlayer.bank >= 1000) {thePlayer.bank = thePlayer.bank - 1000; thePlayer.bet = thePlayer.bet + 1000; sendGameUpdate();}
+                        break;
+                }
+            },
+            playChangeREQ : function(data) {
+                let thePlayer = GameRoomData.Seats[data.player.seat];
+                if(thePlayer.fold == true) return;
+                switch(data.updateData) {
+                    case 'Bet':
+                        let value = calcBJValue(thePlayer.myHand);
+                        if(value < 21) {
+                            let data = {gameId: GameRoomData.gameId, holderType:'PLAYER', cardHolder: thePlayer}
+                            sockets.emit('getNewCardACK', data);
+                        } else {
+                            thePlayer.ready = true;
+                            GameRoomData.turn++;
+                            findNextPlayer();
+                            sendGameUpdate();
+                        }
+                        break;
+                    case 'Stay':
+                        thePlayer.ready = true;
+                        GameRoomData.turn++;
+                        findNextPlayer();
+                        sendGameUpdate();
                         break;
                 }
             }

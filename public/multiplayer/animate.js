@@ -39,6 +39,11 @@ var bettingButtons = new Array();
 var bankText;
 var betText;
 
+//Playing Screen Buttons
+var playingButtons = new Array();
+var dealerBJTxt;
+var playerBJTxt;
+
 //Load Image Resources
 var tableImage = new Image();
 tableImage.src = window.location.protocol+'//'+window.location.host+'/textures/table.png';
@@ -57,6 +62,7 @@ diamondImage.src = window.location.protocol+'//'+window.location.host+'/textures
 
 //Local Cards
 var cardArray = new Array();
+var recLatestCard = false;
 var latestCard;
 var cardOrigin;
 var cardSize = 0;
@@ -201,7 +207,10 @@ function runJavaScriptApp() {
     readyButton =  new ScreenButton(readyButtonText, '200,50,50', 0, height-height/8, width, height/8);
     bankText = new ScreenText('Bank: $0', '255,255,255', 'bold', fontSize/3, 'Ariel', width/8, height*(7/8)-fontSize/4, width/2, 'center');
     betText = new ScreenText('Bet: $0', '255,255,255', 'bold', fontSize/4, 'Ariel', width/8, height*(7/8)-fontSize/2-pad, width/2, 'center');
+    dealerBJTxt = new ScreenText('0', '255, 255, 255', 'bold', fontSize, 'Ariel', width/2 + cardSize*1.5 + pad*2, cardOrigin.y+cardSize*(3/4)+fontSize/4, width/4, 'center');
+    playerBJTxt = new ScreenText('0', '255, 255, 255', 'bold', fontSize, 'Ariel', width/2, height*(15/16), width/4, 'center');
     createBettingButtons();
+    createPlayingButtons();
     createSeats();
 
     //-----------------------------------------------------------------------------------------------------------
@@ -233,6 +242,9 @@ function runJavaScriptApp() {
             case 1:
                 checkBetButtons(true);
                 break;
+            case 3:
+                checkPlayingButtons(true);
+                break;
         }
     });
     canvas.addEventListener('mouseup', function(evt){
@@ -244,6 +256,9 @@ function runJavaScriptApp() {
                 break;
             case 1:
                 checkBetButtons(false);
+                break;
+            case 3: 
+                checkPlayingButtons(false);
                 break;
         }
     });
@@ -289,8 +304,6 @@ function animateFrame(timeStamp) {
                 break;
         }
     }
-    ctx.fillStyle = 'rgb(' + 255 + ',' + 0 + ',' + 0 + ')';
-    ctx.fillRect(curX, curY, 10, 10);
     FPSText.draw(ctx);
 
     previousTimeStamp = timeStamp;
@@ -345,6 +358,7 @@ function drawBettingScreen() {
 function drawDealingScreen() {
     drawSeats(true);
     drawCards();
+    drawBJText();
     if(GameRoomData.hostSocketId == sockets.id) {
         if(GameRoomData.DealerHand.length == 2 && latestCard.animating == false) {goToNext();   return;}
         if(cardArray.length == 0 && GameRoomData.turn == 0) {
@@ -354,7 +368,7 @@ function drawDealingScreen() {
             sockets.emit('getNewCardACK', data);
             GameRoomData.turn++;
         } else {
-            if(latestCard != undefined && latestCard.animating == false) {
+            if(latestCard != undefined && latestCard.animating == false && recLatestCard == true) {
                 findNextPlayer();
                 if(GameRoomData.turn < GameRoomData.playerLimit) {
                     let data = {gameId: GameRoomData.gameId, holderType:'PLAYER', cardHolder: GameRoomData.Seats[GameRoomData.turn]}
@@ -365,10 +379,13 @@ function drawDealingScreen() {
                     sockets.emit('getNewCardACK', data);
                     GameRoomData.turn = 0;
                 }
+                recLatestCard = false;
             }
         }
     }
     function goToNext() {
+        unreadyEveryone();
+        checkDeltBJ();
         GameRoomData.timeLeft = 'NULL';
         GameRoomData.gameStage = 3;
         GameRoomData.turn = 0;
@@ -380,11 +397,30 @@ function drawDealingScreen() {
 function drawPlayingScreen() {
     drawSeats(true);
     drawCards();
+    drawPlayingButtons();
+    drawBJText();
+    if(GameRoomData.hostSocketId == sockets.id) {
+        if(GameRoomData.Seats[GameRoomData.turn] == 'EMPTY' || GameRoomData.Seats[GameRoomData.turn].fold || GameRoomData.Seats[GameRoomData.turn].ready) {
+            if(GameRoomData.turn == 0) {findNextPlayer();   sendGameUpdate();}
+        } else if(GameRoomData.turn >= GameRoomData.playerLimit) {
+            GameRoomData.timeLeft = 'NULL';
+            GameRoomData.gameStage = 4;
+            GameRoomData.turn = 0;
+            sendGameUpdate();
+        } else if (calcBJValue(GameRoomData.Seats[GameRoomData.turn].myHand) == 'BUST') {
+            GameRoomData.Seats[GameRoomData.turn].bet = 0;
+            GameRoomData.turn++;
+            findNextPlayer();
+            sendGameUpdate();
+        }
+    }
 }
 
 //Draw the ending phase of the game
 function drawEndScreen() {
-
+    drawSeats(true);
+    drawCards();
+    drawBJText();
 }
 
 //-----------------------------------------------------------------------------------------------
@@ -413,7 +449,8 @@ function drawLeaderBoard() {
                     ctx.fillStyle = 'rgb(50,150,50)';
                     ctx.fillRect(0, playerNumber*(fontSize+(pad/2))+height/64, width/4, fontSize);
                     let text = new ScreenText(GameRoomData.Seats[i].myName,'255,255,255','bold', fontSize, 'Ariel', 0, playerNumber*(fontSize+(pad/2))+fontSize-fontSize/6+height/64, width/8, 'start');
-                    let text2 = new ScreenText('$'+GameRoomData.Seats[i].bank,'255,255,255','bold', fontSize, 'Ariel', width/4, playerNumber*(fontSize+(pad/2))+fontSize-fontSize/6+height/64, width/8, 'right');
+                    let score = GameRoomData.Seats[i].bank + GameRoomData.Seats[i].bet;
+                    let text2 = new ScreenText('$'+score,'255,255,255','bold', fontSize, 'Ariel', width/4, playerNumber*(fontSize+(pad/2))+fontSize-fontSize/6+height/64, width/8, 'right');
                     text.draw(ctx);
                     text2.draw(ctx);
                     playerNumber++;}}}}}
@@ -438,24 +475,16 @@ function drawSeats(started) {
             seatButtons[i].buttonColor = (started) ? '100,100,100' : '50,50,255';
         } else {
             if(GameRoomData.Seats[i].fold == true) {seatButtons[i].buttonColor = '255,255,50';} else {
-                if(GameRoomData.Seats[i].ready == true) {seatButtons[i].buttonColor = '50,255,50';} else {seatButtons[i].buttonColor = '255,50,50';}
+                if(calcBJValue(GameRoomData.Seats[i].myHand) == 'BUST') {seatButtons[i].buttonColor = '5,5,5';} else {
+                    if(GameRoomData.Seats[i].ready == true) {seatButtons[i].buttonColor = '50,255,50';} else {
+                        if(GameRoomData.turn == i && GameRoomData.gameStage == 3) {seatButtons[i].buttonColor = '50,255,255';} else {seatButtons[i].buttonColor = '255,50,50';}
+                    }
+                }
             }
         }
         seatButtons[i].draw(ctx);
     }
     drawSeatInfo();
-}
-
-//Create array of seats
-function createSeats() {
-    seatButtons = [];
-    let bS = getSize('SEATBUTTON');
-    for(let i = 0; i < GameRoomData.playerLimit; i++) {
-        let gL = getLocation('SEATTEXT', {i:i});
-        let seatText = new ScreenText(i+1, '255,255,255', 'bold', fontSize, 'Ariel', gL.x, gL.y, bS, 'center');
-        gL = getLocation('SEATBUTTON', {i:i});
-        seatButtons[i] = new ScreenButton(seatText, '50, 50, 255', gL.x, gL.y, bS, bS);
-    }
 }
 
 //Check each seat to see if cursor is over button
@@ -493,25 +522,6 @@ function drawReadyButton() {
     readyButton.draw(ctx);
 }
 
-//Make betting buttons
-function createBettingButtons() {
-    let bLoc = {x: 0, y: height*(7/8), xs: width/4, ys: height/8}
-    let bText = new ScreenText('Bet','255,255,255', 'bold', fontSize, 'Ariel', bLoc.x+(bLoc.xs/2), bLoc.y+(bLoc.ys/2)+fontSize/2, bLoc.xs, 'center');
-    bettingButtons[0] = new ScreenButton(bText, '50,255,50', bLoc.x, bLoc.y, bLoc.xs, bLoc.ys);
-    bLoc = {x: width/4, y: height*(7/8), xs: width/2, ys: height/8}
-    bText = new ScreenText('Clear','255,255,255', 'bold', fontSize, 'Ariel', bLoc.x+(bLoc.xs/2), bLoc.y+(bLoc.ys/2)+fontSize/2, bLoc.xs, 'center');
-    bettingButtons[1] = new ScreenButton(bText, '255,50,50', bLoc.x, bLoc.y, bLoc.xs, bLoc.ys);
-    bLoc = {x: width*(3/4), y: height*(7/8), xs: width/4, ys: height/8}
-    bText = new ScreenText('Fold','255,255,255', 'bold', fontSize, 'Ariel', bLoc.x+(bLoc.xs/2), bLoc.y+(bLoc.ys/2)+fontSize/2, bLoc.xs, 'center');
-    bettingButtons[2] = new ScreenButton(bText, '255,255,50', bLoc.x, bLoc.y, bLoc.xs, bLoc.ys);
-    let xM = mobileMode ? width*(1/4): width*(3/4);
-    for(let i = 3; i < 7; i++) {
-        bLoc = {x: xM, y: height-(height/8)*(i-1)-pad*(i-2), xs: width/(mobileMode?2:4), ys: height/8}
-        bText = new ScreenText('$' + Math.pow(10,(i-3)),'255,255,255', 'bold', fontSize, 'Ariel', bLoc.x+(bLoc.xs/2), bLoc.y+(bLoc.ys/2)+fontSize/2, bLoc.xs, 'center');
-        bettingButtons[i] = new ScreenButton(bText, '255,125,50', bLoc.x, bLoc.y, bLoc.xs, bLoc.ys);
-    }
-}
-
 //Draw Betting Buttons
 function drawBettingButtons() {
     let myself = findMe();
@@ -520,6 +530,14 @@ function drawBettingButtons() {
             bettingButtons[i].draw(ctx);
     }
 }}
+
+//Draw Playing Buttons
+function drawPlayingButtons() {
+    let myself = findMe();
+    for(let i = 0; i < playingButtons.length; i++) {
+        if(GameRoomData.turn == myself.seat)    playingButtons[i].draw(ctx);
+    }
+}
 
 //Draw Bet and Bank Text
 function drawBankText() {
@@ -542,6 +560,19 @@ function checkBetButtons(isClicked) {
                 if(isClicked) sendUserData('betChangeREQ', bettingButtons[i].screenText.text);}
             if(!isClicked) bettingButtons[i].isClicked = false;
 }}}
+
+//Check Playing Buttons
+function checkPlayingButtons(isClicked) {
+    let myself = findMe();
+    if(myself.seat != GameRoomData.turn) return;
+    for(let i = 0; i < playingButtons.length; i++) {
+        if(playingButtons[i].clicked(curX, curY)) {
+            playingButtons[i].isClicked = isClicked;
+            if(isClicked) sendUserData('playChangeREQ', playingButtons[i].screenText.text);
+        }
+        if(!isClicked) playingButtons[i].isClicked = false;
+    }
+}
 
 //Player info on each seat
 function drawSeatInfo() {
@@ -568,102 +599,13 @@ function drawCards() {
     }
 }
 
-//Rebuild cards in array is empty or corrupted
-function rebuildCards() {
-    cardArray = [];
-    //Little Cards
-    for(let i = 0; i < GameRoomData.playerLimit; i++) {
-        if(GameRoomData.Seats[i] != 'EMPTY') {
-            for(let k = 0; k < GameRoomData.Seats[i].myHand.length; k++) {
-                // {type: card:}
-                cardArray[cardArray.length] = {type: 'SMALL', card: {}}
-                let loc = getLocation('SMALLCARDS', {i:k});
-                cardArray[cardArray.length-1].card = new Card(loc.x, loc.y, GameRoomData.Seats[i].myHand[k], 'FRONT', false, loc.x, loc.y, loc.rad);
-            }
-        }
-    }
-    //Dealer Cards
-    for(let i = 0; i < GameRoomData.DealerHand.length; i++) {
-        cardArray[cardArray.length] = {type: 'DEALER', card: {}}
-        let loc = getLocation('DEALERCARDS', {i:i});
-        cardArray[cardArray.length-1].card = new Card(loc.x, loc.y, GameRoomData.DealerHand[i], (i==1)?'BACK':'FRONT', true, loc.x, loc.y, 0);
-    }
-    //My Cards
+//Draw Blackjack value for player and dealer
+function drawBJText() {
     let myself = findMe();
-    for(let i = 0; i < myself.myHand.length; i++) {
-        cardArray[cardArray.length] = {type: 'BIG', card: {}}
-        let loc = getLocation('BIGCARDS', {i:i});
-        cardArray[cardArray.length-1].card = new Card(loc.x, loc.y, myself.myHand[i], 'FRONT', true, loc.x, loc.y, 0);
-    }
-}
-
-//Get card amount
-function getCardAmount() {
-    let count = 0;
-    for(let i = 0; i < cardArray.length; i++) {
-        if(cardArray[i].type == 'SMALL' || cardArray[i].type == 'DEALER') count++;
-    }
-    return count;
-}
-
-//Add new card to cardArray
-function addNewCard(data) {
-    //holderType, cardHolder
-    let replaceI = cardArray.length;
-    if(data.holderType == 'DEALER') {
-        // SMALL -> DEALER -> BIG
-        cardArray[replaceI] = {type: 'DEALER', card: {}}
-        let loc = getLocation('DEALERCARDS', {i:data.cardHolder.length-1});
-        cardArray[replaceI].card = new Card(loc.x, loc.y, data.cardHolder[data.cardHolder.length-1], (data.cardHolder.length==2)?'BACK':'FRONT', true, cardOrigin.x, cardOrigin.y, 0);
-        latestCard = cardArray[replaceI].card;
-        sinkDownCard(replaceI, 'DEALER');
-    } else if (data.holderType == 'PLAYER') {
-        let myself = findMe();
-        if(myself == data.cardHolder) {
-            cardArray[replaceI] = {type: 'BIG', card: {}}
-            let loc = getLocation('BIGCARDS', {i:data.cardHolder.myHand.length-1});
-            cardArray[replaceI].card = new Card(loc.x, loc.y, data.cardHolder.myHand[data.cardHolder.myHand.length-1], 'FRONT', true, loc.x, loc.y, 0);
-            replaceI++;
-        }
-        cardArray[replaceI] = {type: 'SMALL', card: {}}
-        let cardData = {i: data.cardHolder.seat, cardI: data.cardHolder.myHand.length-1}
-        let loc = getLocation('SMALLCARDS', cardData);
-        let X = (data.cardHolder.seat >= GameRoomData.playerLimit/2) ? cardOrigin.x - cardSize/2 : cardOrigin.x + cardSize/2;
-        cardArray[replaceI].card = new Card(loc.x, loc.y, data.cardHolder.myHand[data.cardHolder.myHand.length-1], 'FRONT', false, X, cardOrigin.y+cardSize/2, loc.rad);
-        latestCard = cardArray[replaceI].card;
-        sinkDownCard(replaceI, 'SMALL');
-    }
-}
-
-//Sink card down to its location
-function sinkDownCard(replaceIndex, replaceType) {
-    if(cardArray.length > 1) {
-        let j = replaceIndex;
-        while(j > 0 && cardArray[j-1].type == 'BIG') {
-            const temp = cardArray[j];
-            cardArray[j] = cardArray[j-1];
-            cardArray[j-1] = temp;
-            j--;
-        }
-        if(replaceType == 'SMALL') {
-            while(j > 0 && cardArray[j-1].type == 'DEALER') {
-                const temp = cardArray[j];
-                cardArray[j] = cardArray[j-1];
-                cardArray[j-1] = temp;
-                j--;
-            }
-        }
-    }
-}
-
-//Find next player to give card too
-function findNextPlayer() {
-    let i = 0;
-    for(i = GameRoomData.turn; i < GameRoomData.playerLimit; i++) {
-        if(GameRoomData.Seats[i] != 'EMPTY' && GameRoomData.Seats[i].fold == false) return;
-        GameRoomData.turn++;
-    }
-    GameRoomData.turn++;
+    playerBJTxt.text = calcBJValue(myself.myHand);
+    dealerBJTxt.text = calcBJValue(GameRoomData.DealerHand);
+    playerBJTxt.draw(ctx);
+    dealerBJTxt.draw(ctx);
 }
 
 //Create Pixelated Image
