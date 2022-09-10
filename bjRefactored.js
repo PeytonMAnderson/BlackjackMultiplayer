@@ -39,9 +39,11 @@ exports.connectedToServer = function(sio, soc){
     socket.on('getName', getName);
     socket.on('gameUpdate', gameUpdate);    //Used for every game update during the game
     socket.on('requestPlayerToJoin', requestPlayerToJoin);
+    socket.on('getNewCardACK', getNewCardACK);
+    socket.on('resetDeck', resetDeck);
     // Player emits
     socket.on('playerJoinREQ', playerJoinREQ);
-    socket.on('gameChangeREQ', gameChangeREQ);
+    socket.on('gameChangeREQ', gameChangeREQ);  //Used for every game update during the game
 }
 //Generate new lobby code for player creating new lobby
 exports.getGameId = function() {
@@ -56,7 +58,14 @@ exports.getGameId = function() {
 exports.setGame = function(gameId, hostName) {
     //Add Room to RoomsData
     if(RoomsData.has(gameId.toString()) != true) {
-        let serverPacket = {hostSocketId: 'EMPTY', hostName: hostName, color: '0,0,0'}
+        let serverPacket = {
+            hostSocketId: 'EMPTY', 
+            hostName: hostName, 
+            color: '0,0,0',
+            deck: [],
+            deckI: 0,
+            dealerI: 0
+        }
         RoomsData.set(gameId.toString(), serverPacket);}}
 //Remove game from list on server
 exports.removeGame = function(gameId) {
@@ -108,9 +117,6 @@ function playerJoinREQ(data) {
     } catch (error) {console.log(error);}
 }
 
-//Used for every game update in the game
-function gameUpdate(data) {this.broadcast.to(data.gameId).emit('gameUpdateACK', data);}
-
 //Join incoming player to socket game
 function requestPlayerToJoin(data) {
     //Add Player to Game Room
@@ -126,4 +132,57 @@ function gameChangeREQ(data) {
         let room = RoomsData.get(data.pack.gameId);
         io.to(room.hostSocketId.toString()).emit(data.req, data.pack);
     } catch (error) {console.log(error);}
+}
+
+//Used for every game update in the game
+function gameUpdate(data) {this.broadcast.to(data.gameId).emit('gameUpdateACK', data);}
+
+//Host Requested new card for player
+function getNewCardACK(data) {
+    try {
+        //If card is dealersFirst, hide card
+        let thisRoom = RoomsData.get(data.gameId);
+        if(thisRoom.deckI >= thisRoom.deck.length) expandDeck(thisRoom);
+        if(data.holderType == 'DEALER') {
+            if(data.cardHolder.length == 1) {
+                thisRoom.dealerI = thisRoom.deckI;
+                data.cardHolder[data.cardHolder.length] = 'HIDDEN';
+            } else {
+                data.cardHolder[data.cardHolder.length] = thisRoom.deck[thisRoom.deckI];
+            }
+        } else if (data.holderType == 'PLAYER') {
+            data.cardHolder.myHand[data.cardHolder.myHand.length] = thisRoom.deck[thisRoom.deckI];
+        } else {return;}
+        let transmitData = {holderType: data.holderType, cardHolder: data.cardHolder, deckI: thisRoom.deckI}
+        io.to(data.gameId).emit('newCardACK', transmitData);
+        thisRoom.deckI++;
+    } catch (error) {console.log(error);}
+}
+
+//Expand the deck automatically
+function expandDeck(thisRoom) {
+    //Generate Deck
+    for(let i = thisRoom.deckI; i < thisRoom.deckI + 52; i++) {
+        thisRoom.deck[i] = i - thisRoom.deckI;
+    }
+    //Shuffle Deck
+    let currentIndex = thisRoom.deck.length,  randomIndex;
+    while (currentIndex != 0) {
+        // Pick a remaining element...
+        randomIndex = Math.floor(Math.random() * currentIndex);
+        currentIndex--;
+        // And swap it with the current element.
+        [thisRoom.deck[currentIndex], thisRoom.deck[randomIndex]] = [thisRoom.deck[randomIndex], thisRoom.deck[currentIndex]];
+    }
+    console.log(thisRoom.deck);
+}
+
+//Reset Deck
+function resetDeck(data) {
+    let thisRoom = RoomsData.get(data.gameId);
+    if(data.hostSocketId == thisRoom.hostSocketId) {
+        thisRoom.deck = [];
+        thisRoom.dealerI = 0;
+        thisRoom.deckI = 0;
+    }    
 }

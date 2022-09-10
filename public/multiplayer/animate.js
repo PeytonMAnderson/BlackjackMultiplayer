@@ -55,6 +55,13 @@ heartImage.src = window.location.protocol+'//'+window.location.host+'/textures/h
 var diamondImage = new Image();
 diamondImage.src = window.location.protocol+'//'+window.location.host+'/textures/diamond.png';
 
+//Local Cards
+var cardArray = new Array();
+var latestCard;
+var cardOrigin;
+var cardSize = 0;
+var cardTime = 0;
+
 //Controls elements of text on screen
 class ScreenText {
     constructor(Text, color, format, fontS, font, posX, posY, maxWidth, Alignment) {
@@ -103,6 +110,76 @@ class ScreenButton extends ScreenText {
         if(cursorX >= this.x && cursorX <= this.x2) {
             if(cursorY >= this.y && cursorY <= this.y2) {return true;}} return false;}}
 
+class Card {
+    constructor(X, Y, cardValue, face, isBig, OrgX, OrgY, rotation) {
+        this.cardValue = cardValue;
+        this.xf = X;
+        this.yf = Y;
+        this.x = OrgX;
+        this.y = OrgY;
+        this.size = isBig ? cardSize : cardSize/2;
+        this.face = face;
+        this.animating = (this.x != this.xf || this.y != this.yf);
+        this.rotate = rotation;
+    }
+    calcSuite() {
+        if(this.cardValue >= 0 && this.cardValue <= 12)   return "club";
+        if(this.cardValue >= 13 && this.cardValue <= 25)  return "spade";
+        if(this.cardValue >= 26 && this.cardValue <= 38)  return "heart";
+        if(this.cardValue >= 39 && this.cardValue <= 51)  return "diamond";
+    }
+    calcValue() {return this.cardValue % 13;}
+    calcFaceValue() {
+        let crudeValue = this.calcValue();
+        if(crudeValue >= 1 && crudeValue <= 9) {crudeValue++;   return crudeValue;}
+        if(crudeValue == 10)    return "J";
+        if(crudeValue == 11)    return "Q";
+        if(crudeValue == 12)    return "K";
+        if(crudeValue == 0)    return "A";}
+    draw(ctx) {
+        let thisX = this.x;
+        let thisY = this.y;
+        if(this.rotate != 0) {
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            ctx.rotate((this.rotate)*Math.PI/180);
+            thisX = 0;  thisY = 0;
+        }
+        if(this.face == 'FRONT') {
+            make_image(cardFront, thisX, thisY, this.size, this.size*1.5, ctx);
+            let suite = this.calcSuite();
+            let value = this.calcFaceValue();
+            let cardIcon;
+            if(suite == 'diamond' || suite == 'heart') {
+                ctx.fillStyle = 'rgb(255,0,0)';
+                if(suite == 'diamond') {cardIcon = diamondImage;} else {cardIcon = heartImage;}} else {
+                ctx.fillStyle = 'rgb(0,0,0)';
+                if(suite == 'spade') {cardIcon = spadeImage;} else {cardIcon = clubImage;}}
+            ctx.font = "italic bold " + this.size*0.5 + "pt Ariel";
+            ctx.textAlign = 'center';
+            ctx.fillText(value, thisX+this.size/2, thisY+this.size/2, this.size);
+            make_image(cardIcon, thisX, thisY+(this.size*0.5), this.size, this.size, ctx);
+        } else if(this.face == 'BACK') {make_image(cardBack, thisX, thisY, this.size, this.size*1.5, ctx); }
+        if(this.rotate != 0) {ctx.restore();}
+    }
+    animate(ctx, time) {
+        if(this.animating == true) {
+            const vx = (this.xf - this.x) / ((time/1000)*FPS/4);
+            const vy = (this.yf - this.y) / ((time/1000)*FPS/4);
+            //If animation passed stop point
+            if(this.xf == this.x && this.yf == this.y || Math.abs(vx) < 0.001 && Math.abs(vy) < 0.001) {
+                this.x = this.xf;
+                this.y = this.yf;
+                this.animating = false;
+            } else {
+                this.x = this.x+vx;
+                this.y = this.y+vy;
+            }
+        }
+        this.draw(ctx);
+    }
+}
+
 function runJavaScriptApp() {
     //-----------------------------------------------------------------------------------------------------------
     //INITIALIZE DEPENDANCIES
@@ -115,6 +192,8 @@ function runJavaScriptApp() {
     fontSize = getSize('FONT');
     pad = getSize('PAD');
     if(height > width) mobileMode = true;
+    cardOrigin = getLocation('CARDORIGIN');
+    cardSize = getSize('CARDSIZE');
     updateOffset();
 
     FPSText = new ScreenText('0','255,255,255','bold', fontSize, 'Ariel', width, fontSize, width/8, 'right');
@@ -169,6 +248,7 @@ function runJavaScriptApp() {
         }
     });
     //Start Game
+    startTimer = true;
     window.requestAnimationFrame(animateFrame);
 }
 
@@ -190,6 +270,7 @@ function animateFrame(timeStamp) {
         //Add player list in desktop mode
         drawBackground(GameRoomData.color);
         drawLeaderBoard();
+        make_image(cardBack, cardOrigin.x, cardOrigin.y, cardSize, cardSize*1.5, ctx);
         switch(GameRoomData.gameStage) {
             case 0:
                 drawWaitingScreen();
@@ -255,17 +336,50 @@ function drawBettingScreen() {
         if(lobbyReady || GameRoomData.timeLeft <= 0) {
             GameRoomData.timeLeft = 'NULL';
             GameRoomData.gameStage = 2;
+            GameRoomData.turn = 0;
+            autoFold();
             unreadyEveryone();
             sendGameUpdate();}}}
 
 //Draw the Dealing phase of the game
 function drawDealingScreen() {
     drawSeats(true);
+    drawCards();
+    if(GameRoomData.hostSocketId == sockets.id) {
+        if(GameRoomData.DealerHand.length == 2 && latestCard.animating == false) {goToNext();   return;}
+        if(cardArray.length == 0 && GameRoomData.turn == 0) {
+            findNextPlayer();
+            if(GameRoomData.turn >= GameRoomData.playerLimit) {goToNext();    return;}
+            let data = {gameId: GameRoomData.gameId, holderType:'PLAYER', cardHolder: GameRoomData.Seats[GameRoomData.turn]}
+            sockets.emit('getNewCardACK', data);
+            GameRoomData.turn++;
+        } else {
+            if(latestCard != undefined && latestCard.animating == false) {
+                findNextPlayer();
+                if(GameRoomData.turn < GameRoomData.playerLimit) {
+                    let data = {gameId: GameRoomData.gameId, holderType:'PLAYER', cardHolder: GameRoomData.Seats[GameRoomData.turn]}
+                    sockets.emit('getNewCardACK', data);
+                    GameRoomData.turn++;
+                } else {
+                    let data = {gameId: GameRoomData.gameId, holderType:'DEALER', cardHolder: GameRoomData.DealerHand}
+                    sockets.emit('getNewCardACK', data);
+                    GameRoomData.turn = 0;
+                }
+            }
+        }
+    }
+    function goToNext() {
+        GameRoomData.timeLeft = 'NULL';
+        GameRoomData.gameStage = 3;
+        GameRoomData.turn = 0;
+        sendGameUpdate();
+    }
 }
 
 //Draw the playing phase of the game
 function drawPlayingScreen() {
-
+    drawSeats(true);
+    drawCards();
 }
 
 //Draw the ending phase of the game
@@ -337,9 +451,9 @@ function createSeats() {
     seatButtons = [];
     let bS = getSize('SEATBUTTON');
     for(let i = 0; i < GameRoomData.playerLimit; i++) {
-        let gL = getLocation('SEATTEXT', i);
+        let gL = getLocation('SEATTEXT', {i:i});
         let seatText = new ScreenText(i+1, '255,255,255', 'bold', fontSize, 'Ariel', gL.x, gL.y, bS, 'center');
-        gL = getLocation('SEATBUTTON', i);
+        gL = getLocation('SEATBUTTON', {i:i});
         seatButtons[i] = new ScreenButton(seatText, '50, 50, 255', gL.x, gL.y, bS, bS);
     }
 }
@@ -433,18 +547,123 @@ function checkBetButtons(isClicked) {
 function drawSeatInfo() {
     for(let i = 0; i < GameRoomData.playerLimit; i++) {
         if(GameRoomData.Seats[i] != 'EMPTY') {
-            let gL = getLocation('SEATNAME', i);
+            let gL = getLocation('SEATNAME', {i:i});
             let alignT = i >= GameRoomData.playerLimit/2 ? 'left' : 'right'
             let seatName = new ScreenText(GameRoomData.Seats[i].myName,'255,255,255', 'bold', fontSize/4, 'Ariel', gL.x, gL.y, getSize('SEATBUTTON')*1.5, alignT);
-            gL = getLocation('SEATBANK', i);
+            gL = getLocation('SEATBANK', {i:i});
             let seatBank = new ScreenText('Bank: $' + GameRoomData.Seats[i].bank,'255,255,255', 'bold', fontSize/4, 'Ariel', gL.x, gL.y, getSize('SEATBUTTON')*1.5, alignT);
-            gL = getLocation('SEATBET', i);
+            gL = getLocation('SEATBET', {i:i});
             let seatBet = new ScreenText('Bet: $' + GameRoomData.Seats[i].bet,'255,255,255', 'bold', fontSize/4, 'Ariel', gL.x, gL.y, getSize('SEATBUTTON')*1.5, alignT);
             seatName.draw(ctx);
             seatBank.draw(ctx);
             seatBet.draw(ctx);
         }
     }
+}
+
+//Draw Cards in game
+function drawCards() {
+    for(let i = 0; i < cardArray.length; i++) {
+        cardArray[i].card.animate(ctx, 250);
+    }
+}
+
+//Rebuild cards in array is empty or corrupted
+function rebuildCards() {
+    cardArray = [];
+    //Little Cards
+    for(let i = 0; i < GameRoomData.playerLimit; i++) {
+        if(GameRoomData.Seats[i] != 'EMPTY') {
+            for(let k = 0; k < GameRoomData.Seats[i].myHand.length; k++) {
+                // {type: card:}
+                cardArray[cardArray.length] = {type: 'SMALL', card: {}}
+                let loc = getLocation('SMALLCARDS', {i:k});
+                cardArray[cardArray.length-1].card = new Card(loc.x, loc.y, GameRoomData.Seats[i].myHand[k], 'FRONT', false, loc.x, loc.y, loc.rad);
+            }
+        }
+    }
+    //Dealer Cards
+    for(let i = 0; i < GameRoomData.DealerHand.length; i++) {
+        cardArray[cardArray.length] = {type: 'DEALER', card: {}}
+        let loc = getLocation('DEALERCARDS', {i:i});
+        cardArray[cardArray.length-1].card = new Card(loc.x, loc.y, GameRoomData.DealerHand[i], (i==1)?'BACK':'FRONT', true, loc.x, loc.y, 0);
+    }
+    //My Cards
+    let myself = findMe();
+    for(let i = 0; i < myself.myHand.length; i++) {
+        cardArray[cardArray.length] = {type: 'BIG', card: {}}
+        let loc = getLocation('BIGCARDS', {i:i});
+        cardArray[cardArray.length-1].card = new Card(loc.x, loc.y, myself.myHand[i], 'FRONT', true, loc.x, loc.y, 0);
+    }
+}
+
+//Get card amount
+function getCardAmount() {
+    let count = 0;
+    for(let i = 0; i < cardArray.length; i++) {
+        if(cardArray[i].type == 'SMALL' || cardArray[i].type == 'DEALER') count++;
+    }
+    return count;
+}
+
+//Add new card to cardArray
+function addNewCard(data) {
+    //holderType, cardHolder
+    let replaceI = cardArray.length;
+    if(data.holderType == 'DEALER') {
+        // SMALL -> DEALER -> BIG
+        cardArray[replaceI] = {type: 'DEALER', card: {}}
+        let loc = getLocation('DEALERCARDS', {i:data.cardHolder.length-1});
+        cardArray[replaceI].card = new Card(loc.x, loc.y, data.cardHolder[data.cardHolder.length-1], (data.cardHolder.length==2)?'BACK':'FRONT', true, cardOrigin.x, cardOrigin.y, 0);
+        latestCard = cardArray[replaceI].card;
+        sinkDownCard(replaceI, 'DEALER');
+    } else if (data.holderType == 'PLAYER') {
+        let myself = findMe();
+        if(myself == data.cardHolder) {
+            cardArray[replaceI] = {type: 'BIG', card: {}}
+            let loc = getLocation('BIGCARDS', {i:data.cardHolder.myHand.length-1});
+            cardArray[replaceI].card = new Card(loc.x, loc.y, data.cardHolder.myHand[data.cardHolder.myHand.length-1], 'FRONT', true, loc.x, loc.y, 0);
+            replaceI++;
+        }
+        cardArray[replaceI] = {type: 'SMALL', card: {}}
+        let cardData = {i: data.cardHolder.seat, cardI: data.cardHolder.myHand.length-1}
+        let loc = getLocation('SMALLCARDS', cardData);
+        let X = (data.cardHolder.seat >= GameRoomData.playerLimit/2) ? cardOrigin.x - cardSize/2 : cardOrigin.x + cardSize/2;
+        cardArray[replaceI].card = new Card(loc.x, loc.y, data.cardHolder.myHand[data.cardHolder.myHand.length-1], 'FRONT', false, X, cardOrigin.y+cardSize/2, loc.rad);
+        latestCard = cardArray[replaceI].card;
+        sinkDownCard(replaceI, 'SMALL');
+    }
+}
+
+//Sink card down to its location
+function sinkDownCard(replaceIndex, replaceType) {
+    if(cardArray.length > 1) {
+        let j = replaceIndex;
+        while(j > 0 && cardArray[j-1].type == 'BIG') {
+            const temp = cardArray[j];
+            cardArray[j] = cardArray[j-1];
+            cardArray[j-1] = temp;
+            j--;
+        }
+        if(replaceType == 'SMALL') {
+            while(j > 0 && cardArray[j-1].type == 'DEALER') {
+                const temp = cardArray[j];
+                cardArray[j] = cardArray[j-1];
+                cardArray[j-1] = temp;
+                j--;
+            }
+        }
+    }
+}
+
+//Find next player to give card too
+function findNextPlayer() {
+    let i = 0;
+    for(i = GameRoomData.turn; i < GameRoomData.playerLimit; i++) {
+        if(GameRoomData.Seats[i] != 'EMPTY' && GameRoomData.Seats[i].fold == false) return;
+        GameRoomData.turn++;
+    }
+    GameRoomData.turn++;
 }
 
 //Create Pixelated Image
