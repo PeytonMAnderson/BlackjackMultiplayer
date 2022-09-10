@@ -81,8 +81,6 @@ function findMe(){
     if(GameRoomData.Seats[ind].myName == myName) {return GameRoomData.Seats[ind];} else {return undefined;}
 }
 
-//COUNTDOWN
-let intervalID = undefined;
 //Start coundown
 function startCountdown(seconds) {
     if(GameRoomData.timeLeft == 'NULL') {
@@ -95,12 +93,10 @@ function startCountdown(seconds) {
 
 //Stop countdown
 function stopCountdown() {
-    if(GameRoomData.timeLeft != 'NULL') {
-        GameRoomData.timeLeft = 'NULL';
-        clearInterval(intervalID);
-        intervalID = undefined;
-        sendGameUpdate();
-    }
+    GameRoomData.timeLeft = 'NULL';
+    clearInterval(intervalID);
+    intervalID = undefined;
+    sendGameUpdate();
 }
 
 //Update Countdown
@@ -138,6 +134,11 @@ function unreadyEveryone() {
         if(GameRoomData.Seats[i] != 'EMPTY') {
             if(GameRoomData.Seats[i].fold == false) {
                 GameRoomData.Seats[i].ready = false;}}}}
+function unfoldEveryone() {
+    if(sockets.id != GameRoomData.hostSocketId) {return;}
+    for(let i = 0; i < GameRoomData.playerLimit; i++) {
+        if(GameRoomData.Seats[i] != 'EMPTY') {
+            GameRoomData.Seats[i].fold = false;}}}
 
 //Fold everyone that has not bet
 function autoFold() {
@@ -191,6 +192,7 @@ function checkDeltBJ() {
                     GameRoomData.Seats[i].bank = GameRoomData.Seats[i].bank + (GameRoomData.Seats[i].bet * 3);
                     GameRoomData.Seats[i].bet = 0;
                     GameRoomData.Seats[i].ready = true;
+                    GameRoomData.Seats[i].win = 'W';
                 }
             }
         }
@@ -343,4 +345,46 @@ function createPlayingButtons() {
             playingButtons[playingButtons.length] = pB;
         }
     }
+}
+
+//Reset Win Status
+function resetWin() {
+    for(let i = 0; i < GameRoomData.playerLimit; i++) {
+        if(GameRoomData.Seats[i] != 'EMPTY') {
+            GameRoomData.Seats[i].win = 'NULL';
+        }
+    }
+}
+
+//Reset Game Data for next round
+function resetRound() {               
+    GameRoomData.gameStage = 1;
+    GameRoomData.turn = 0;
+    GameRoomData.timeLeft = 'NULL';
+    GameRoomData.DealerHand = [];
+    for(let i = 0; i < GameRoomData.playerLimit; i++) {
+        if(GameRoomData.Seats[i] != 'EMPTY') {
+            GameRoomData.Seats[i].myHand = [];
+            GameRoomData.Seats[i].win = 'NULL';
+            GameRoomData.Seats[i].ready = false;
+            GameRoomData.Seats[i].fold = false;
+        }
+    }
+    unfoldEveryone();
+    unreadyEveryone();
+    resetLocals();
+}
+
+//Reset Local Variables back to beginning
+function resetLocals() {
+    timeElapsed = 0;
+    beginTime = 0;
+    startTimer = true;
+    cardArray = [];
+    recLatestCard = false;
+    latestCard = undefined;
+    cardTime = 0;
+    timeSinceUpdate = 0;
+    for(let i = 0; i < bettingButtons.length; i++) bettingButtons[i].isClicked = false;
+    for(let i = 0; i < playingButtons.length; i++) playingButtons[i].isClicked = false;
 }

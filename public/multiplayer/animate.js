@@ -15,6 +15,8 @@ var beginTime = 0;
 var timeElapsed = 0;
 var FPS = 0;
 var FPSText;
+//COUNTDOWN
+var intervalID = undefined;
 
 //Set up cursor variables
 var curX;
@@ -208,7 +210,7 @@ function runJavaScriptApp() {
     bankText = new ScreenText('Bank: $0', '255,255,255', 'bold', fontSize/3, 'Ariel', width/8, height*(7/8)-fontSize/4, width/2, 'center');
     betText = new ScreenText('Bet: $0', '255,255,255', 'bold', fontSize/4, 'Ariel', width/8, height*(7/8)-fontSize/2-pad, width/2, 'center');
     dealerBJTxt = new ScreenText('0', '255, 255, 255', 'bold', fontSize, 'Ariel', width/2 + cardSize*1.5 + pad*2, cardOrigin.y+cardSize*(3/4)+fontSize/4, width/4, 'center');
-    playerBJTxt = new ScreenText('0', '255, 255, 255', 'bold', fontSize, 'Ariel', width/2, height*(15/16), width/4, 'center');
+    playerBJTxt = new ScreenText('0', '255, 255, 255', 'bold', fontSize, 'Ariel', width/2, height*(15/16), cardSize, 'center');
     createBettingButtons();
     createPlayingButtons();
     createSeats();
@@ -305,7 +307,6 @@ function animateFrame(timeStamp) {
         }
     }
     FPSText.draw(ctx);
-
     previousTimeStamp = timeStamp;
     reqAnim = window.requestAnimationFrame(animateFrame);}
 //-----------------------------------------------------------------------------------------------
@@ -331,6 +332,7 @@ function drawWaitingScreen() {
         if(GameRoomData.timeLeft <= 0) {
             GameRoomData.timeLeft = 'NULL';
             GameRoomData.gameStage = 1;
+            stopCountdown();
             unreadyEveryone();
             sendGameUpdate();}}}
 
@@ -341,7 +343,7 @@ function drawBettingScreen() {
     drawBankText();
     drawCountdown(30);
     if(sockets.id == GameRoomData.hostSocketId) {
-        if(GameRoomData.timeLeft == 'NULL') startCountdown(30);
+        if(GameRoomData.timeLeft == 'NULL') {startCountdown(30);}
         let lobbyReady = true;
         for(let i = 0; i < GameRoomData.playerLimit; i++) {
             if(GameRoomData.Seats[i].ready == false && GameRoomData.Seats[i].fold == false) {lobbyReady = false; break;}
@@ -352,6 +354,7 @@ function drawBettingScreen() {
             GameRoomData.turn = 0;
             autoFold();
             unreadyEveryone();
+            stopCountdown();
             sendGameUpdate();}}}
 
 //Draw the Dealing phase of the game
@@ -385,6 +388,7 @@ function drawDealingScreen() {
     }
     function goToNext() {
         unreadyEveryone();
+        resetWin();
         checkDeltBJ();
         GameRoomData.timeLeft = 'NULL';
         GameRoomData.gameStage = 3;
@@ -400,14 +404,18 @@ function drawPlayingScreen() {
     drawPlayingButtons();
     drawBJText();
     if(GameRoomData.hostSocketId == sockets.id) {
-        if(GameRoomData.Seats[GameRoomData.turn] == 'EMPTY' || GameRoomData.Seats[GameRoomData.turn].fold || GameRoomData.Seats[GameRoomData.turn].ready) {
-            if(GameRoomData.turn == 0) {findNextPlayer();   sendGameUpdate();}
-        } else if(GameRoomData.turn >= GameRoomData.playerLimit) {
+        //After all player's turn
+        if(GameRoomData.turn >= GameRoomData.playerLimit) {
             GameRoomData.timeLeft = 'NULL';
             GameRoomData.gameStage = 4;
             GameRoomData.turn = 0;
             sendGameUpdate();
+        //If the current seat is not playable
+        } else if (GameRoomData.Seats[GameRoomData.turn] == 'EMPTY' || GameRoomData.Seats[GameRoomData.turn].fold || GameRoomData.Seats[GameRoomData.turn].ready) {
+            if (GameRoomData.turn == 0) {findNextPlayer();  sendGameUpdate();}
+        //If current player busted, move to next
         } else if (calcBJValue(GameRoomData.Seats[GameRoomData.turn].myHand) == 'BUST') {
+            GameRoomData.Seats[GameRoomData.turn].win = 'L';
             GameRoomData.Seats[GameRoomData.turn].bet = 0;
             GameRoomData.turn++;
             findNextPlayer();
@@ -421,6 +429,53 @@ function drawEndScreen() {
     drawSeats(true);
     drawCards();
     drawBJText();
+    if(GameRoomData.hostSocketId == sockets.id) {
+        //If Dealer has less than 17, add more cards
+        let dealerV = calcBJValue(GameRoomData.DealerHand);
+        if(latestCard != undefined && !latestCard.animating && recLatestCard && dealerV != 'BUST' && dealerV < 17) {
+            let data = {gameId: GameRoomData.gameId, holderType:'DEALER', cardHolder: GameRoomData.DealerHand}
+            sockets.emit('getNewCardACK', data);
+            recLatestCard = false;
+        }
+        //Dealer busts, win everyone still in
+        if(dealerV == 'BUST' && !latestCard.animating) {
+            for(let i = 0; i < GameRoomData.playerLimit; i++) {
+                if(GameRoomData.Seats[i] != 'EMPTY') {
+                    if(!GameRoomData.Seats[i].fold) {
+                        if(GameRoomData.Seats[i].win == 'NULL') {
+                            GameRoomData.Seats[i].win = 'W';
+                            GameRoomData.Seats[i].bank = GameRoomData.Seats[i].bank + (GameRoomData.Seats[i].bet * 2);
+                        }
+                    }
+                }
+            }
+            resetRound();
+            sendGameUpdate();
+        //Dealer reached 17, compare everyone still in
+        } else if(dealerV >= 17 && !latestCard.animating) {
+            for(let i = 0; i < GameRoomData.playerLimit; i++) {
+                if(GameRoomData.Seats[i] != 'EMPTY') {
+                    if(!GameRoomData.Seats[i].fold) {
+                        if(GameRoomData.Seats[i].win == 'NULL') {
+                            let playerV = calcBJValue(GameRoomData.Seats[i].myHand);
+                            if(playerV > dealerV) {
+                                GameRoomData.Seats[i].win = 'W';
+                                GameRoomData.Seats[i].bank = GameRoomData.Seats[i].bank + (GameRoomData.Seats[i].bet * 2);                             
+                            } else if(playerV == dealerV) {
+                                GameRoomData.Seats[i].win = 'T';
+                                GameRoomData.Seats[i].bank = GameRoomData.Seats[i].bank + (GameRoomData.Seats[i].bet * 1);                
+                            } else {
+                                GameRoomData.Seats[i].win = 'L';
+                                GameRoomData.Seats[i].bet = 0;  
+                            }
+                        }
+                    }
+                }
+            }
+            resetRound();
+            sendGameUpdate();
+        }
+    }
 }
 
 //-----------------------------------------------------------------------------------------------

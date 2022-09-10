@@ -155,6 +155,7 @@ jQuery(function($){
                 IO.socket.emit('playerJoinREQ', data);
             },
             gameUpdateACK : function (data) {
+                if(GameRoomData.gameStage > data.gameStage) resetLocals();
                 if(GameRoomData.timeLeft !=  data.timeLeft) timeSinceUpdate = 0;
                 LostPlayersMap = new Map(JSON.parse(data.LostPlayers));
                 //Player is new to this game
