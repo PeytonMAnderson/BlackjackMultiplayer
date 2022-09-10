@@ -57,6 +57,7 @@ diamondImage.src = window.location.protocol+'//'+window.location.host+'/textures
 
 //Local Cards
 var cardArray = new Array();
+var latestCard;
 var cardOrigin;
 var cardSize = 0;
 var cardTime = 0;
@@ -163,8 +164,8 @@ class Card {
     }
     animate(ctx, time) {
         if(this.animating == true) {
-            const vx = (this.xf - this.x) / ((time/1000)*143/4);
-            const vy = (this.yf - this.y) / ((time/1000)*143/4);
+            const vx = (this.xf - this.x) / ((time/1000)*FPS/4);
+            const vy = (this.yf - this.y) / ((time/1000)*FPS/4);
             //If animation passed stop point
             if(this.xf == this.x && this.yf == this.y || Math.abs(vx) < 0.001 && Math.abs(vy) < 0.001) {
                 this.x = this.xf;
@@ -178,81 +179,6 @@ class Card {
         this.draw(ctx);
     }
 }
-
-class OldCard {
-    constructor(posX, posY, cardIndexValue, face, isBig, rotate) {
-        this.cardIndexValue = cardIndexValue;
-        this.face = face;
-        this.x = posX;
-        this.y = posY;
-        this.rad = rotate;
-        this.big = isBig;
-        this.animating = false;
-        this.animStart = 0;
-        this.animEnd = 0;}
-    //Methods
-    flip() {if(this.face == 'FRONT') {this.face = 'BACK';} else {this.face = 'FRONT';}}
-    calcSuite() {
-        if(this.cardIndexValue >= 1 && this.cardIndexValue <= 13)   return "Clubs";
-        if(this.cardIndexValue >= 14 && this.cardIndexValue <= 26)  return "Spades";
-        if(this.cardIndexValue >= 27 && this.cardIndexValue <= 39)  return "Hearts";
-        if(this.cardIndexValue >= 40 && this.cardIndexValue <= 52)  return "Diamonds";}
-    calcValue() {
-        if(this.cardIndexValue >= 1 && this.cardIndexValue <= 13)   return this.cardIndexValue;
-        if(this.cardIndexValue >= 14 && this.cardIndexValue <= 26)  return this.cardIndexValue-13;
-        if(this.cardIndexValue >= 27 && this.cardIndexValue <= 39)  return this.cardIndexValue-26;
-        if(this.cardIndexValue >= 40 && this.cardIndexValue <= 52)  return this.cardIndexValue-39;}
-    calcFaceValue() {
-        let crudeValue = this.calcValue(this.cardIndexValue);
-        if(crudeValue >= 1 && crudeValue <= 9) {crudeValue++;   return crudeValue;}
-        if(crudeValue == 10)    return "J";
-        if(crudeValue == 11)    return "Q";
-        if(crudeValue == 12)    return "K";
-        if(crudeValue == 13)    return "A";}
-    buildCard(ctx, rotate) {
-        if(rotate == true) {rotateCardAndDraw(this.x, this.y, this.rad, this);} else {
-            let thisCardSize = cardSize;
-            if(this.big == false) {thisCardSize = cardSize/2;}
-            if(this.face == 'BACK') {make_image(cardBack, this.x, this.y, thisCardSize, thisCardSize*1.5, ctx);}
-            if(this.face == 'FRONT') {
-                make_image(cardFront, this.x, this.y, thisCardSize, thisCardSize*1.5, ctx);
-                let cardSuite = this.calcSuite(this.cardIndexValue);
-                let cardValue = this.calcFaceValue(this.cardIndexValue);
-                if(cardValue != undefined) {
-                    if (cardSuite == "Hearts" || cardSuite == "Diamonds") {
-                    ctx.fillStyle = 'rgb(255,0,0)';
-                    ctx.font = "italic bold " + thisCardSize*0.5 + "pt Tahoma";
-                    ctx.textAlign = 'center';
-                    ctx.fillText(cardValue, this.x+thisCardSize/2, this.y+thisCardSize/2, thisCardSize);
-                    if(cardSuite == "Hearts") {make_image(heartImage, this.x, this.y+(thisCardSize*0.5), thisCardSize, thisCardSize, ctx);}
-                    if(cardSuite == "Diamonds") {make_image(diamondImage, this.x, this.y+(thisCardSize*0.5), thisCardSize, thisCardSize, ctx);}
-                    } else {
-                    ctx.fillStyle = 'rgb(0,0,0)';
-                    ctx.font = "italic bold " + thisCardSize*0.5 + "pt Tahoma";
-                    ctx.textAlign = 'center';
-                    ctx.fillText(cardValue, this.x+thisCardSize/2, this.y+thisCardSize/2, thisCardSize);
-                    if(cardSuite == "Spades") {make_image(spadeImage, this.x, this.y+(thisCardSize*0.5), thisCardSize, thisCardSize, ctx);}
-                    if(cardSuite == "Clubs") {make_image(clubImage, this.x, this.y+(thisCardSize*0.5), thisCardSize, thisCardSize, ctx);}
-                    }} else {ctx.fillStyle = 'rgb(0,0,0)';  ctx.fillRect(this.x-1, this.y-1, thisCardSize+2, thisCardSize*1.5+2);}}}}
-    animateCardTo(desX, desY, time, ctx) {
-        if(this.animStart == 0) {
-            this.animating = true;
-            this.animStart = timeElapsed;
-            this.animEnd = this.animStart + time;}
-        if(timeElapsed < this.animEnd) {
-            //Continue Animations
-            this.animating = true;
-            let vx = 2 * (desX - this.x) / ((time*(FPS/1000))/4);
-            let vy = 2 * (desY - this.y) / ((time*(FPS/1000))/4);
-            this.x = this.x+vx;
-            this.y = this.y+vy;
-            if(this.rad == 0) {this.buildCard(ctx, false);} else {this.buildCard(ctx, true);}
-        } else if (timeElapsed > this.animEnd) {
-            if(this.x != desX || this.y != desY) {this.x = desX;    this.y = desY;}
-            this.animating = false;
-            this.animStart = 0;
-            this.animEnd = 0;}}}
-            
 
 function runJavaScriptApp() {
     //-----------------------------------------------------------------------------------------------------------
@@ -344,6 +270,7 @@ function animateFrame(timeStamp) {
         //Add player list in desktop mode
         drawBackground(GameRoomData.color);
         drawLeaderBoard();
+        make_image(cardBack, cardOrigin.x, cardOrigin.y, cardSize, cardSize*1.5, ctx);
         switch(GameRoomData.gameStage) {
             case 0:
                 drawWaitingScreen();
@@ -409,6 +336,7 @@ function drawBettingScreen() {
         if(lobbyReady || GameRoomData.timeLeft <= 0) {
             GameRoomData.timeLeft = 'NULL';
             GameRoomData.gameStage = 2;
+            GameRoomData.turn = 0;
             autoFold();
             unreadyEveryone();
             sendGameUpdate();}}}
@@ -418,26 +346,40 @@ function drawDealingScreen() {
     drawSeats(true);
     drawCards();
     if(GameRoomData.hostSocketId == sockets.id) {
-        for(let i = 0; i < (GameRoomData.playerLimit+1)*4; i++) {
-            if(i < (GameRoomData.playerLimit+1)*2) {
-                if(cardTime == i*144) {
-                    let data = {gameId: GameRoomData.gameId, holderType:'PLAYER', cardHolder: GameRoomData.Seats[0]}
+        if(GameRoomData.DealerHand.length == 2 && latestCard.animating == false) {goToNext();   return;}
+        if(cardArray.length == 0 && GameRoomData.turn == 0) {
+            findNextPlayer();
+            if(GameRoomData.turn >= GameRoomData.playerLimit) {goToNext();    return;}
+            let data = {gameId: GameRoomData.gameId, holderType:'PLAYER', cardHolder: GameRoomData.Seats[GameRoomData.turn]}
+            sockets.emit('getNewCardACK', data);
+            GameRoomData.turn++;
+        } else {
+            if(latestCard != undefined && latestCard.animating == false) {
+                findNextPlayer();
+                if(GameRoomData.turn < GameRoomData.playerLimit) {
+                    let data = {gameId: GameRoomData.gameId, holderType:'PLAYER', cardHolder: GameRoomData.Seats[GameRoomData.turn]}
                     sockets.emit('getNewCardACK', data);
-                }
-            } else {
-                if(cardTime == i*144) {
+                    GameRoomData.turn++;
+                } else {
                     let data = {gameId: GameRoomData.gameId, holderType:'DEALER', cardHolder: GameRoomData.DealerHand}
                     sockets.emit('getNewCardACK', data);
+                    GameRoomData.turn = 0;
                 }
             }
         }
-        cardTime++;
+    }
+    function goToNext() {
+        GameRoomData.timeLeft = 'NULL';
+        GameRoomData.gameStage = 3;
+        GameRoomData.turn = 0;
+        sendGameUpdate();
     }
 }
 
 //Draw the playing phase of the game
 function drawPlayingScreen() {
-
+    drawSeats(true);
+    drawCards();
 }
 
 //Draw the ending phase of the game
@@ -509,9 +451,9 @@ function createSeats() {
     seatButtons = [];
     let bS = getSize('SEATBUTTON');
     for(let i = 0; i < GameRoomData.playerLimit; i++) {
-        let gL = getLocation('SEATTEXT', i);
+        let gL = getLocation('SEATTEXT', {i:i});
         let seatText = new ScreenText(i+1, '255,255,255', 'bold', fontSize, 'Ariel', gL.x, gL.y, bS, 'center');
-        gL = getLocation('SEATBUTTON', i);
+        gL = getLocation('SEATBUTTON', {i:i});
         seatButtons[i] = new ScreenButton(seatText, '50, 50, 255', gL.x, gL.y, bS, bS);
     }
 }
@@ -605,12 +547,12 @@ function checkBetButtons(isClicked) {
 function drawSeatInfo() {
     for(let i = 0; i < GameRoomData.playerLimit; i++) {
         if(GameRoomData.Seats[i] != 'EMPTY') {
-            let gL = getLocation('SEATNAME', i);
+            let gL = getLocation('SEATNAME', {i:i});
             let alignT = i >= GameRoomData.playerLimit/2 ? 'left' : 'right'
             let seatName = new ScreenText(GameRoomData.Seats[i].myName,'255,255,255', 'bold', fontSize/4, 'Ariel', gL.x, gL.y, getSize('SEATBUTTON')*1.5, alignT);
-            gL = getLocation('SEATBANK', i);
+            gL = getLocation('SEATBANK', {i:i});
             let seatBank = new ScreenText('Bank: $' + GameRoomData.Seats[i].bank,'255,255,255', 'bold', fontSize/4, 'Ariel', gL.x, gL.y, getSize('SEATBUTTON')*1.5, alignT);
-            gL = getLocation('SEATBET', i);
+            gL = getLocation('SEATBET', {i:i});
             let seatBet = new ScreenText('Bet: $' + GameRoomData.Seats[i].bet,'255,255,255', 'bold', fontSize/4, 'Ariel', gL.x, gL.y, getSize('SEATBUTTON')*1.5, alignT);
             seatName.draw(ctx);
             seatBank.draw(ctx);
@@ -622,7 +564,7 @@ function drawSeatInfo() {
 //Draw Cards in game
 function drawCards() {
     for(let i = 0; i < cardArray.length; i++) {
-        cardArray[i].card.animate(ctx, 1000);
+        cardArray[i].card.animate(ctx, 250);
     }
 }
 
@@ -635,22 +577,22 @@ function rebuildCards() {
             for(let k = 0; k < GameRoomData.Seats[i].myHand.length; k++) {
                 // {type: card:}
                 cardArray[cardArray.length] = {type: 'SMALL', card: {}}
-                let loc = getLocation('SMALLCARDS', k);
-                cardArray[cardArray.length-1].card = new Card(loc.x, loc.y, GameRoomData.Seats[i].myHand[k], 'FRONT', false, loc.x, loc.y, 90);
+                let loc = getLocation('SMALLCARDS', {i:k});
+                cardArray[cardArray.length-1].card = new Card(loc.x, loc.y, GameRoomData.Seats[i].myHand[k], 'FRONT', false, loc.x, loc.y, loc.rad);
             }
         }
     }
     //Dealer Cards
     for(let i = 0; i < GameRoomData.DealerHand.length; i++) {
         cardArray[cardArray.length] = {type: 'DEALER', card: {}}
-        let loc = getLocation('DEALERCARDS', i);
+        let loc = getLocation('DEALERCARDS', {i:i});
         cardArray[cardArray.length-1].card = new Card(loc.x, loc.y, GameRoomData.DealerHand[i], (i==1)?'BACK':'FRONT', true, loc.x, loc.y, 0);
     }
     //My Cards
     let myself = findMe();
     for(let i = 0; i < myself.myHand.length; i++) {
         cardArray[cardArray.length] = {type: 'BIG', card: {}}
-        let loc = getLocation('BIGCARDS', i);
+        let loc = getLocation('BIGCARDS', {i:i});
         cardArray[cardArray.length-1].card = new Card(loc.x, loc.y, myself.myHand[i], 'FRONT', true, loc.x, loc.y, 0);
     }
 }
@@ -671,20 +613,25 @@ function addNewCard(data) {
     if(data.holderType == 'DEALER') {
         // SMALL -> DEALER -> BIG
         cardArray[replaceI] = {type: 'DEALER', card: {}}
-        let loc = getLocation('DEALERCARDS', data.cardHolder.length-1);
+        let loc = getLocation('DEALERCARDS', {i:data.cardHolder.length-1});
         cardArray[replaceI].card = new Card(loc.x, loc.y, data.cardHolder[data.cardHolder.length-1], (data.cardHolder.length==2)?'BACK':'FRONT', true, cardOrigin.x, cardOrigin.y, 0);
+        latestCard = cardArray[replaceI].card;
         sinkDownCard(replaceI, 'DEALER');
     } else if (data.holderType == 'PLAYER') {
         let myself = findMe();
         if(myself == data.cardHolder) {
             cardArray[replaceI] = {type: 'BIG', card: {}}
-            let loc = getLocation('BIGCARDS', data.cardHolder.myHand.length-1);
-            cardArray[replaceI].card = new Card(loc.x, loc.y, data.cardHolder.myHand[data.cardHolder.myHand.length-1], 'FRONT', true, cardOrigin.x, cardOrigin.y, 0);
+            let loc = getLocation('BIGCARDS', {i:data.cardHolder.myHand.length-1});
+            cardArray[replaceI].card = new Card(loc.x, loc.y, data.cardHolder.myHand[data.cardHolder.myHand.length-1], 'FRONT', true, loc.x, loc.y, 0);
+            replaceI++;
         }
-        cardArray[replaceI+1] = {type: 'SMALL', card: {}}
-        let loc = getLocation('SMALLCARDS', data.cardHolder.myHand.length-1);
-        cardArray[replaceI+1].card = new Card(loc.x, loc.y, data.cardHolder.myHand[data.cardHolder.myHand.length-1], 'FRONT', false, cardOrigin.x, cardOrigin.y, 90);
-        sinkDownCard(replaceI+1, 'SMALL');
+        cardArray[replaceI] = {type: 'SMALL', card: {}}
+        let cardData = {i: data.cardHolder.seat, cardI: data.cardHolder.myHand.length-1}
+        let loc = getLocation('SMALLCARDS', cardData);
+        let X = (data.cardHolder.seat >= GameRoomData.playerLimit/2) ? cardOrigin.x - cardSize/2 : cardOrigin.x + cardSize/2;
+        cardArray[replaceI].card = new Card(loc.x, loc.y, data.cardHolder.myHand[data.cardHolder.myHand.length-1], 'FRONT', false, X, cardOrigin.y+cardSize/2, loc.rad);
+        latestCard = cardArray[replaceI].card;
+        sinkDownCard(replaceI, 'SMALL');
     }
 }
 
@@ -699,7 +646,7 @@ function sinkDownCard(replaceIndex, replaceType) {
             j--;
         }
         if(replaceType == 'SMALL') {
-            while(j > 0 && cardArray[j-1].type == 'SMALL') {
+            while(j > 0 && cardArray[j-1].type == 'DEALER') {
                 const temp = cardArray[j];
                 cardArray[j] = cardArray[j-1];
                 cardArray[j-1] = temp;
@@ -708,6 +655,17 @@ function sinkDownCard(replaceIndex, replaceType) {
         }
     }
 }
+
+//Find next player to give card too
+function findNextPlayer() {
+    let i = 0;
+    for(i = GameRoomData.turn; i < GameRoomData.playerLimit; i++) {
+        if(GameRoomData.Seats[i] != 'EMPTY' && GameRoomData.Seats[i].fold == false) return;
+        GameRoomData.turn++;
+    }
+    GameRoomData.turn++;
+}
+
 //Create Pixelated Image
 function make_image(base_image, xwidth, yheight, xSize, ySize, ctx) {
     ctx.imageSmoothingEnabled = false;

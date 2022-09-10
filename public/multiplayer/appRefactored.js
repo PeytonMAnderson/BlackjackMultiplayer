@@ -179,10 +179,11 @@ jQuery(function($){
                 document.getElementById("t3").innerHTML = myName;   //Add name to top bar
                 document.getElementById("t2").innerHTML = GameRoomData.gameId;  //Add gameId to top bar
                 document.getElementById("t1").innerHTML = GameRoomData.playerCount + '/' + GameRoomData.playerLimit;    //Add playercount to top bar
+                rebuildCards();
             },
             newCardACK : function (data) {
                 // {holderType: cardHolder: deckI: }
-                if(getCardAmount() != data.deckI-1) rebuildCards();
+                if(getCardAmount() != data.deckI) rebuildCards();
                 if(data.holderType == 'DEALER') {
                     GameRoomData.DealerHand = data.cardHolder;
                 } else if (data.holderType == 'PLAYER'){
