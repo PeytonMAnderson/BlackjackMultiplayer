@@ -211,7 +211,7 @@ function runJavaScriptApp() {
     readyButton =  new ScreenButton(readyButtonText, '200,50,50', 0, height-height/8, width, height/8);
     bankText = new ScreenText('Bank: $0', '255,255,255', 'bold', fontSize/3, 'Ariel', width/8, height*(7/8)-fontSize/4, width/2, 'center');
     betText = new ScreenText('Bet: $0', '255,255,255', 'bold', fontSize/4, 'Ariel', width/8, height*(7/8)-fontSize/2-pad, width/2, 'center');
-    dealerBJTxt = new ScreenText('0', '255, 255, 255', 'bold', fontSize, 'Ariel', width/2 + cardSize*1.5 + pad*2, cardOrigin.y+cardSize*(3/4)+fontSize/4, width/4, 'center');
+    dealerBJTxt = new ScreenText('0', '255, 255, 255', 'bold', fontSize, 'Ariel', width/2 + cardSize*1.5 + pad*2, cardOrigin.y+cardSize*(3/4)+fontSize/4, cardSize, 'center');
     playerBJTxt = new ScreenText('0', '255, 255, 255', 'bold', fontSize, 'Ariel', width/2, height*(15/16), cardSize, 'center');
     winStateTxt = new ScreenText('NULL', '0, 0, 0', 'bold', fontSize*2, 'Ariel', width/2, height/2+fontSize, width/4, 'center');
     createBettingButtons();
