@@ -1,10 +1,11 @@
 # BlackjackMultiplayer
 Javscript Canvas Blackjack game with multiplayer functionality. 
-    Uses: 
-        Node.js 
-        Express
-        Socket.io
-        jQuery
+Uses: 
+
+Node.js 
+Express
+Socket.io
+jQuery
         
 --Singleplayer Mode is deprecated
 
