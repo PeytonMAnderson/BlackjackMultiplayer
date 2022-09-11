@@ -1,4 +1,4 @@
-# BlackjackMultiplayer
+# Blackjack Website with Multiplayer Lobbies
 Javscript Canvas Blackjack game with multiplayer functionality. 
 
 Uses: 
