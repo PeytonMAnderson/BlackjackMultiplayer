@@ -46,6 +46,9 @@ var playingButtons = new Array();
 var dealerBJTxt;
 var playerBJTxt;
 
+//Win State Text
+var winStateTxt;
+
 //Load Image Resources
 var tableImage = new Image();
 tableImage.src = window.location.protocol+'//'+window.location.host+'/textures/table.png';
@@ -84,10 +87,9 @@ class ScreenText {
         this.align = Alignment;}
     //Methods
     draw(ctx) {
-        //ctx.fillStyle = 'rgb(' + this.color + ')';
+        ctx.fillStyle = 'rgb(' + this.color + ')';
         ctx.font = this.format + ' ' + this.size + 'px' + ' ' + this.font;
         ctx.textAlign = this.align;
-        ctx.fillStyle = 'rgb(' + 255 + ',' + 255 + ',' + 255 + ')';
         ctx.fillText(this.text, this.x, this.y, this.maxWidth);}}
 //Controls Elements of a Button
 class ScreenButton extends ScreenText {
@@ -211,6 +213,7 @@ function runJavaScriptApp() {
     betText = new ScreenText('Bet: $0', '255,255,255', 'bold', fontSize/4, 'Ariel', width/8, height*(7/8)-fontSize/2-pad, width/2, 'center');
     dealerBJTxt = new ScreenText('0', '255, 255, 255', 'bold', fontSize, 'Ariel', width/2 + cardSize*1.5 + pad*2, cardOrigin.y+cardSize*(3/4)+fontSize/4, width/4, 'center');
     playerBJTxt = new ScreenText('0', '255, 255, 255', 'bold', fontSize, 'Ariel', width/2, height*(15/16), cardSize, 'center');
+    winStateTxt = new ScreenText('NULL', '0, 0, 0', 'bold', fontSize*2, 'Ariel', width/2, height/2+fontSize, width/4, 'center');
     createBettingButtons();
     createPlayingButtons();
     createSeats();
@@ -246,6 +249,9 @@ function runJavaScriptApp() {
                 break;
             case 3:
                 checkPlayingButtons(true);
+                break;
+            case 4:
+                sendUserData('readyUpREQ');
                 break;
         }
     });
@@ -352,6 +358,7 @@ function drawBettingScreen() {
             GameRoomData.timeLeft = 'NULL';
             GameRoomData.gameStage = 2;
             GameRoomData.turn = 0;
+            GameRoomData.DealerHand = [];
             autoFold();
             unreadyEveryone();
             stopCountdown();
@@ -406,7 +413,9 @@ function drawPlayingScreen() {
     if(GameRoomData.hostSocketId == sockets.id) {
         //After all player's turn
         if(GameRoomData.turn >= GameRoomData.playerLimit) {
+            sockets.emit('getDealersHidden', GameRoomData.gameId);
             GameRoomData.timeLeft = 'NULL';
+            unreadyEveryone();
             GameRoomData.gameStage = 4;
             GameRoomData.turn = 0;
             sendGameUpdate();
@@ -429,6 +438,10 @@ function drawEndScreen() {
     drawSeats(true);
     drawCards();
     drawBJText();
+    calcWinState();
+    if(winStateTxt.text != 'NULL')  winStateTxt.draw(ctx);
+    //If no one played this round
+    if(cardArray.length < 3) {resetRound();    sendGameUpdate();}
     if(GameRoomData.hostSocketId == sockets.id) {
         //If Dealer has less than 17, add more cards
         let dealerV = calcBJValue(GameRoomData.DealerHand);
@@ -439,20 +452,24 @@ function drawEndScreen() {
         }
         //Dealer busts, win everyone still in
         if(dealerV == 'BUST' && !latestCard.animating) {
+            let ready = true;
             for(let i = 0; i < GameRoomData.playerLimit; i++) {
                 if(GameRoomData.Seats[i] != 'EMPTY') {
                     if(!GameRoomData.Seats[i].fold) {
                         if(GameRoomData.Seats[i].win == 'NULL') {
                             GameRoomData.Seats[i].win = 'W';
                             GameRoomData.Seats[i].bank = GameRoomData.Seats[i].bank + (GameRoomData.Seats[i].bet * 2);
+                            GameRoomData.Seats[i].bet = 0; 
+                            sendGameUpdate();
                         }
+                        if(!GameRoomData.Seats[i].ready) ready = false;
                     }
                 }
             }
-            resetRound();
-            sendGameUpdate();
+            if(ready) {resetRound();    sendGameUpdate();}
         //Dealer reached 17, compare everyone still in
         } else if(dealerV >= 17 && !latestCard.animating) {
+            let ready = true;
             for(let i = 0; i < GameRoomData.playerLimit; i++) {
                 if(GameRoomData.Seats[i] != 'EMPTY') {
                     if(!GameRoomData.Seats[i].fold) {
@@ -460,20 +477,21 @@ function drawEndScreen() {
                             let playerV = calcBJValue(GameRoomData.Seats[i].myHand);
                             if(playerV > dealerV) {
                                 GameRoomData.Seats[i].win = 'W';
-                                GameRoomData.Seats[i].bank = GameRoomData.Seats[i].bank + (GameRoomData.Seats[i].bet * 2);                             
+                                GameRoomData.Seats[i].bank = GameRoomData.Seats[i].bank + (GameRoomData.Seats[i].bet * 2);                        
                             } else if(playerV == dealerV) {
                                 GameRoomData.Seats[i].win = 'T';
-                                GameRoomData.Seats[i].bank = GameRoomData.Seats[i].bank + (GameRoomData.Seats[i].bet * 1);                
+                                GameRoomData.Seats[i].bank = GameRoomData.Seats[i].bank + (GameRoomData.Seats[i].bet * 1);            
                             } else {
                                 GameRoomData.Seats[i].win = 'L';
-                                GameRoomData.Seats[i].bet = 0;  
                             }
+                            GameRoomData.Seats[i].bet = 0; 
+                            sendGameUpdate();
                         }
+                        if(!GameRoomData.Seats[i].ready) ready = false;
                     }
                 }
             }
-            resetRound();
-            sendGameUpdate();
+            if(ready) {resetRound();    sendGameUpdate();}
         }
     }
 }
