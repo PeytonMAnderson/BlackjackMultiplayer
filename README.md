@@ -21,7 +21,7 @@ Edit config.json for server settings:
 }
 ```
 
-Install dependances
+Install dependances:
 ```
 npm run install
 ```
@@ -34,7 +34,7 @@ or
 ```
 npm run start
 ```
-#Use
+# Use
 
 Go to website:
 ```
