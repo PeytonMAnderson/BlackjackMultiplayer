@@ -57,9 +57,11 @@ jQuery(function($){
             IO.socket.on('readyChangeREQ', App.Host.readyChangeREQ); //A player is trying to ready or unready
             IO.socket.on('betChangeREQ', App.Host.betChangeREQ); //A player is trying change their bet
             IO.socket.on('playChangeREQ', App.Host.playChangeREQ);
+            IO.socket.on('readyUpREQ', App.Host.readyUpREQ);
             //Player Events
             IO.socket.on('gameUpdateACK', App.Player.gameUpdateACK); //Used for any game update during the game
             IO.socket.on('newCardACK', App.Player.newCardACK);
+            IO.socket.on('getDealersHiddenACK', App.Player.getDealersHiddenACK); //Recieve dealers second (hidden) card
             IO.socket.on('hostLeft', App.Player.hostLeft);  //The host left, remove everyone
         },
         //#5 Socket Connected, attempt to join or create new room using game code
@@ -194,6 +196,17 @@ jQuery(function($){
                 addNewCard(data);
                 recLatestCard = true;
             },
+            getDealersHiddenACK : function (data) {
+                GameRoomData.DealerHand[1] = data;
+                for(let i = cardArray.length-1; i > 0; i--) {
+                    if(cardArray[i].card.face == 'BACK') {
+                        cardArray[i].card.cardValue = data;
+                        cardArray[i].card.face = 'FRONT';
+                        break;
+                    }
+                }
+
+            },
             hostLeft : function () {
                 App.$gameArea.html(App.$templateReturn);
                 clearEverything();},
@@ -303,7 +316,7 @@ jQuery(function($){
                 let thePlayer = GameRoomData.Seats[data.player.seat];
                 if(thePlayer.fold == true) return;
                 switch(data.updateData) {
-                    case 'Bet':
+                    case 'Hit':
                         let value = calcBJValue(thePlayer.myHand);
                         if(value < 21) {
                             let data = {gameId: GameRoomData.gameId, holderType:'PLAYER', cardHolder: thePlayer}
@@ -322,6 +335,10 @@ jQuery(function($){
                         sendGameUpdate();
                         break;
                 }
+            },
+            readyUpREQ : function(data) {
+                let thePlayer = GameRoomData.Seats[data.player.seat];
+                if(thePlayer.fold == false) thePlayer.ready = true;
             }
         }
     };

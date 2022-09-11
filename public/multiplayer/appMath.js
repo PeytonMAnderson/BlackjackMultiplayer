@@ -335,7 +335,7 @@ function createPlayingButtons() {
     for(let i = 0; i < 2; i++) {
         if(i % 2 == 0) {
             pL = {x: 0, y: height*(7/8) - (height/8) * i}
-            let pT = new ScreenText('Bet', '255,255,255', 'bold', fontSize, 'Ariel', pL.x+width/8, pL.y+height/8-fontSize/4, width/4, 'center');
+            let pT = new ScreenText('Hit', '255,255,255', 'bold', fontSize, 'Ariel', pL.x+width/8, pL.y+height/8-fontSize/4, width/4, 'center');
             let pB = new ScreenButton(pT, '50,255,50', pL.x, pL.y, width/4, height/8);
             playingButtons[playingButtons.length] = pB;
         } else {
@@ -370,6 +370,7 @@ function resetRound() {
             GameRoomData.Seats[i].fold = false;
         }
     }
+    sockets.emit('resetDeck', {gameId: GameRoomData.gameId, hostSocketId: GameRoomData.hostSocketId});
     unfoldEveryone();
     unreadyEveryone();
     resetLocals();
@@ -387,4 +388,27 @@ function resetLocals() {
     timeSinceUpdate = 0;
     for(let i = 0; i < bettingButtons.length; i++) bettingButtons[i].isClicked = false;
     for(let i = 0; i < playingButtons.length; i++) playingButtons[i].isClicked = false;
+}
+
+//Calcuate the win state of my game
+function calcWinState() {
+    let myself = findMe();
+    switch(myself.win){
+        case 'NULL':
+            winStateTxt.color = '255,255,255';
+            winStateTxt.text = 'NULL';
+            break;
+        case 'W':
+            winStateTxt.color = '50,255,50';
+            winStateTxt.text = 'W';
+            break;
+        case 'T':
+            winStateTxt.color = '50,50,255';
+            winStateTxt.text = 'T';
+            break;
+        case 'L':
+            winStateTxt.color = '255,50,50';
+            winStateTxt.text = 'L';
+            break;
+    }
 }

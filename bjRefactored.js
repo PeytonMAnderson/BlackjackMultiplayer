@@ -41,6 +41,7 @@ exports.connectedToServer = function(sio, soc){
     socket.on('requestPlayerToJoin', requestPlayerToJoin);
     socket.on('getNewCardACK', getNewCardACK);
     socket.on('resetDeck', resetDeck);
+    socket.on('getDealersHidden', getDealersHidden);
     // Player emits
     socket.on('playerJoinREQ', playerJoinREQ);
     socket.on('gameChangeREQ', gameChangeREQ);  //Used for every game update during the game
@@ -185,4 +186,10 @@ function resetDeck(data) {
         thisRoom.dealerI = 0;
         thisRoom.deckI = 0;
     }    
+}
+
+//Host request the hidden host card
+function getDealersHidden(gameId) {
+    let thisRoom = RoomsData.get(gameId);
+    io.to(gameId).emit('getDealersHiddenACK', thisRoom.deck[thisRoom.dealerI]);
 }
