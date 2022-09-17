@@ -57,6 +57,8 @@ exports.getGameId = function() {
         if(RoomsData.has(newGameId.toString()) != true) {collide = false; return newGameId;} }}
 //Creates new empty game lobby on the server
 exports.setGame = function(gameId, hostName) {
+    //Clean up other half-made lobbies
+    cleanUpLobbies();
     //Add Room to RoomsData
     if(RoomsData.has(gameId.toString()) != true) {
         let serverPacket = {
@@ -175,7 +177,6 @@ function expandDeck(thisRoom) {
         // And swap it with the current element.
         [thisRoom.deck[currentIndex], thisRoom.deck[randomIndex]] = [thisRoom.deck[randomIndex], thisRoom.deck[currentIndex]];
     }
-    console.log(thisRoom.deck);
 }
 
 //Reset Deck
@@ -192,4 +193,11 @@ function resetDeck(data) {
 function getDealersHidden(gameId) {
     let thisRoom = RoomsData.get(gameId);
     io.to(gameId).emit('getDealersHiddenACK', thisRoom.deck[thisRoom.dealerI]);
+}
+
+//Clean up half made lobbies
+function cleanUpLobbies() {
+    RoomsData.forEach((value, key, map) => {
+        if(value.hostSocketId == 'EMPTY') RoomsData.delete(key);
+    });
 }

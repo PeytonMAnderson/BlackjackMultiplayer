@@ -47,19 +47,19 @@ function getLocation(typeFor, data) {
         else if(width < height/2) {loc = {x: width*(4/100), y: height/2-width+width*(4/100)}}
         else                      {loc = {x: height*(4/200), y: height*(4/200)}}
     } else if (typeFor == 'DEALERCARDS') {
-        loc = {x:  width/2 - pad - cardSize, y: cardOrigin.y + cardSize*(1/8)*(data.i-1)}
-        if(data.i % 2 == 0) { loc = {x:  width/2 + pad, y: cardOrigin.y + cardSize*(1/8)*(data.i)}}
+        loc = {x:  width/2 - pad - cardSize, y: cardOrigin.y + cardSize*(1/4)*(data.i-1)}
+        if(data.i % 2 == 0) { loc = {x:  width/2 + pad, y: cardOrigin.y + cardSize*(1/4)*(data.i)}}
     } else if (typeFor == 'BIGCARDS') {
-        loc = {x:  width/2 - pad - cardSize, y: height*(7/8) - cardSize*1.5 - cardSize*(1/8)*(data.i-1)}
-        if(data.i % 2 == 0) { loc = {x:  width/2 + pad, y: height*(7/8) - cardSize*1.5 - cardSize*(1/8)*(data.i)}}
+        loc = {x:  width/2 - pad - cardSize, y: height*(7/8) - cardSize*1.5 - cardSize*(1/4)*(data.i-1)}
+        if(data.i % 2 == 0) { loc = {x:  width/2 + pad, y: height*(7/8) - cardSize*1.5 - cardSize*(1/4)*(data.i)}}
     } else if (typeFor == 'SMALLCARDS') {
         let seatLoc = getLocation('SEATBET', data);
         if(data.i >= GameRoomData.playerLimit/2) {
-            loc = {x: seatLoc.x + cardSize + (cardSize/16)*(data.cardI-1), y: seatLoc.y - fontSize/4 - cardSize/2, rad: 90}
-            if(data.cardI % 2 == 0) {loc.x = seatLoc.x + cardSize + (cardSize/16)*(data.cardI); loc.y = seatLoc.y + fontSize/16}
+            loc = {x: seatLoc.x + cardSize + (cardSize/8)*(data.cardI-1), y: seatLoc.y - fontSize/4 - cardSize/2, rad: 90}
+            if(data.cardI % 2 == 0) {loc.x = seatLoc.x + cardSize + (cardSize/8)*(data.cardI); loc.y = seatLoc.y + fontSize/16}
         } else {
-            loc = {x: seatLoc.x - cardSize - (cardSize/16)*(data.cardI), y: seatLoc.y - fontSize/4, rad: 270}
-            if(data.cardI % 2 == 1) {loc.x = seatLoc.x - cardSize - (cardSize/16)*(data.cardI-1); loc.y = seatLoc.y + cardSize/2 + fontSize/16}            
+            loc = {x: seatLoc.x - cardSize - (cardSize/8)*(data.cardI), y: seatLoc.y - fontSize/4, rad: 270}
+            if(data.cardI % 2 == 1) {loc.x = seatLoc.x - cardSize - (cardSize/8)*(data.cardI-1); loc.y = seatLoc.y + cardSize/2 + fontSize/16}            
         }
     }
     return loc;
@@ -189,7 +189,7 @@ function checkDeltBJ() {
         if(GameRoomData.Seats[i] != 'EMPTY') {
             if(!GameRoomData.Seats[i].fold) {
                 if(calcBJValue(GameRoomData.Seats[i].myHand) == 21) {
-                    GameRoomData.Seats[i].bank = GameRoomData.Seats[i].bank + (GameRoomData.Seats[i].bet * 3);
+                    GameRoomData.Seats[i].bank = GameRoomData.Seats[i].bank + (GameRoomData.Seats[i].bet * winMult.toFixed(1) * 1.5);
                     GameRoomData.Seats[i].bet = 0;
                     GameRoomData.Seats[i].ready = true;
                     GameRoomData.Seats[i].win = 'W';
@@ -257,7 +257,8 @@ function rebuildCards() {
     for(let i = 0; i < GameRoomData.DealerHand.length; i++) {
         cardArray[cardArray.length] = {type: 'DEALER', card: {}}
         let loc = getLocation('DEALERCARDS', {i:i});
-        cardArray[cardArray.length-1].card = new Card(loc.x, loc.y, GameRoomData.DealerHand[i], (i==1)?'BACK':'FRONT', true, loc.x, loc.y, 0);
+        let face = (GameRoomData.DealerHand[i] == 'HIDDEN') ? 'BACK' : 'FRONT';
+        cardArray[cardArray.length-1].card = new Card(loc.x, loc.y, GameRoomData.DealerHand[i], face, true, loc.x, loc.y, 0);
     }
     //My Cards
     let myself = findMe();
@@ -276,7 +277,8 @@ function addNewCard(data) {
         // SMALL -> DEALER -> BIG
         cardArray[replaceI] = {type: 'DEALER', card: {}}
         let loc = getLocation('DEALERCARDS', {i:data.cardHolder.length-1});
-        cardArray[replaceI].card = new Card(loc.x, loc.y, data.cardHolder[data.cardHolder.length-1], (data.cardHolder.length==2)?'BACK':'FRONT', true, cardOrigin.x, cardOrigin.y, 0);
+        let face = (data.cardHolder[data.cardHolder.length-1] == 'HIDDEN') ? 'BACK' : 'FRONT';
+        cardArray[replaceI].card = new Card(loc.x, loc.y, data.cardHolder[data.cardHolder.length-1], face, true, cardOrigin.x, cardOrigin.y, 0);
         latestCard = cardArray[replaceI].card;
         sinkDownCard(replaceI, 'DEALER');
     } else if (data.holderType == 'PLAYER') {
@@ -357,8 +359,8 @@ function resetWin() {
 }
 
 //Reset Game Data for next round
-function resetRound() {               
-    GameRoomData.gameStage = 1;
+function resetRound(gameStage) {     
+    GameRoomData.gameStage = gameStage;
     GameRoomData.turn = 0;
     GameRoomData.timeLeft = 'NULL';
     GameRoomData.DealerHand = [];
@@ -368,6 +370,10 @@ function resetRound() {
             GameRoomData.Seats[i].win = 'NULL';
             GameRoomData.Seats[i].ready = false;
             GameRoomData.Seats[i].fold = false;
+            if(gameStage == 0) {
+                GameRoomData.Seats[i].bank = startingBank;
+                GameRoomData.Seats[i].bet = 0;
+            }
         }
     }
     sockets.emit('resetDeck', {gameId: GameRoomData.gameId, hostSocketId: GameRoomData.hostSocketId});

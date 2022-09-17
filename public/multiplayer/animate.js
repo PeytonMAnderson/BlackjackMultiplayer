@@ -64,6 +64,14 @@ var heartImage = new Image();
 heartImage.src = window.location.protocol+'//'+window.location.host+'/textures/heart.png';
 var diamondImage = new Image();
 diamondImage.src = window.location.protocol+'//'+window.location.host+'/textures/diamond.png';
+var gear = new Image();
+gear.src = window.location.protocol+'//'+window.location.host+'/textures/gear.png';
+var arrow = new Image();
+arrow.src = window.location.protocol+'//'+window.location.host+'/textures/arrow.png';
+var plus = new Image();
+plus.src = window.location.protocol+'//'+window.location.host+'/textures/plus.png';
+var minus = new Image();
+minus.src = window.location.protocol+'//'+window.location.host+'/textures/minus.png';
 
 //Local Cards
 var cardArray = new Array();
@@ -72,6 +80,15 @@ var latestCard;
 var cardOrigin;
 var cardSize = 0;
 var cardTime = 0;
+
+//Host Options
+// Gear, Settings menu
+var hostButtonPress = [false, false];
+var hostOptions = new Array();
+
+//Host Options
+var startingBank = 2000;
+var winMult = 2.0;
 
 //Controls elements of text on screen
 class ScreenText {
@@ -206,7 +223,7 @@ function runJavaScriptApp() {
     cardSize = getSize('CARDSIZE');
     updateOffset();
 
-    FPSText = new ScreenText('0','255,255,255','bold', fontSize, 'Ariel', width, fontSize, width/8, 'right');
+    FPSText = new ScreenText('0','255,255,255','bold', fontSize/4, 'Ariel', width, fontSize/4, width/16, 'right');
     readyButtonText =  new ScreenText('Not Ready', '255,255,255', 'bold', height/16, 'Ariel', width/2, height-height/32, width, 'center');
     readyButton =  new ScreenButton(readyButtonText, '200,50,50', 0, height-height/8, width, height/8);
     bankText = new ScreenText('Bank: $0', '255,255,255', 'bold', fontSize/3, 'Ariel', width/8, height*(7/8)-fontSize/4, width/2, 'center');
@@ -214,6 +231,7 @@ function runJavaScriptApp() {
     dealerBJTxt = new ScreenText('0', '255, 255, 255', 'bold', fontSize, 'Ariel', width/2 + cardSize*1.5 + pad*2, cardOrigin.y+cardSize*(3/4)+fontSize/4, cardSize, 'center');
     playerBJTxt = new ScreenText('0', '255, 255, 255', 'bold', fontSize, 'Ariel', width/2, height*(15/16), cardSize, 'center');
     winStateTxt = new ScreenText('NULL', '0, 0, 0', 'bold', fontSize*2, 'Ariel', width/2, height/2+fontSize, width/4, 'center');
+    createHostOptions();
     createBettingButtons();
     createPlayingButtons();
     createSeats();
@@ -241,8 +259,10 @@ function runJavaScriptApp() {
         //GameStages
         switch(GameRoomData.gameStage) {
             case 0:
-                if(findMe().ready != true) {checkSeatButtons(true);}
-                checkReadyButton(true);
+                if(hostButtonPress[1] == false) {
+                    if(findMe().ready != true) {checkSeatButtons(true);}
+                    checkReadyButton(true);
+                }
                 break;
             case 1:
                 checkBetButtons(true);
@@ -254,6 +274,7 @@ function runJavaScriptApp() {
                 sendUserData('readyUpREQ');
                 break;
         }
+        if(sockets.id == GameRoomData.hostSocketId) updateHostButtons(GameRoomData.gameStage, true);
     });
     canvas.addEventListener('mouseup', function(evt){
         //GameStages
@@ -269,6 +290,7 @@ function runJavaScriptApp() {
                 checkPlayingButtons(false);
                 break;
         }
+        if(sockets.id == GameRoomData.hostSocketId) updateHostButtons(GameRoomData.gameStage, false);
     });
     //Start Game
     startTimer = true;
@@ -311,6 +333,7 @@ function animateFrame(timeStamp) {
                 drawEndScreen();
                 break;
         }
+        if(sockets.id == GameRoomData.hostSocketId) drawHostButtons(GameRoomData.gameStage);
     }
     FPSText.draw(ctx);
     previousTimeStamp = timeStamp;
@@ -414,6 +437,7 @@ function drawPlayingScreen() {
         //After all player's turn
         if(GameRoomData.turn >= GameRoomData.playerLimit) {
             sockets.emit('getDealersHidden', GameRoomData.gameId);
+            recLatestCard = false;
             GameRoomData.timeLeft = 'NULL';
             unreadyEveryone();
             GameRoomData.gameStage = 4;
@@ -441,7 +465,7 @@ function drawEndScreen() {
     calcWinState();
     if(winStateTxt.text != 'NULL')  winStateTxt.draw(ctx);
     //If no one played this round
-    if(cardArray.length < 3) {resetRound();    sendGameUpdate();}
+    if(cardArray.length < 3) {resetRound(1);    sendGameUpdate();}
     if(GameRoomData.hostSocketId == sockets.id) {
         //If Dealer has less than 17, add more cards
         let dealerV = calcBJValue(GameRoomData.DealerHand);
@@ -458,7 +482,7 @@ function drawEndScreen() {
                     if(!GameRoomData.Seats[i].fold) {
                         if(GameRoomData.Seats[i].win == 'NULL') {
                             GameRoomData.Seats[i].win = 'W';
-                            GameRoomData.Seats[i].bank = GameRoomData.Seats[i].bank + (GameRoomData.Seats[i].bet * 2);
+                            GameRoomData.Seats[i].bank = GameRoomData.Seats[i].bank + (GameRoomData.Seats[i].bet * winMult.toFixed(1));
                             GameRoomData.Seats[i].bet = 0; 
                             sendGameUpdate();
                         }
@@ -466,7 +490,7 @@ function drawEndScreen() {
                     }
                 }
             }
-            if(ready) {resetRound();    sendGameUpdate();}
+            if(ready) {resetRound(1);   sendGameUpdate();}
         //Dealer reached 17, compare everyone still in
         } else if(dealerV >= 17 && !latestCard.animating) {
             let ready = true;
@@ -477,10 +501,10 @@ function drawEndScreen() {
                             let playerV = calcBJValue(GameRoomData.Seats[i].myHand);
                             if(playerV > dealerV) {
                                 GameRoomData.Seats[i].win = 'W';
-                                GameRoomData.Seats[i].bank = GameRoomData.Seats[i].bank + (GameRoomData.Seats[i].bet * 2);                        
+                                GameRoomData.Seats[i].bank = GameRoomData.Seats[i].bank + (GameRoomData.Seats[i].bet * winMult.toFixed(1));                        
                             } else if(playerV == dealerV) {
                                 GameRoomData.Seats[i].win = 'T';
-                                GameRoomData.Seats[i].bank = GameRoomData.Seats[i].bank + (GameRoomData.Seats[i].bet * 1);            
+                                GameRoomData.Seats[i].bank = GameRoomData.Seats[i].bank + GameRoomData.Seats[i].bet;            
                             } else {
                                 GameRoomData.Seats[i].win = 'L';
                             }
@@ -491,7 +515,7 @@ function drawEndScreen() {
                     }
                 }
             }
-            if(ready) {resetRound();    sendGameUpdate();}
+            if(ready) {resetRound(1);   sendGameUpdate();}
         }
     }
 }
@@ -686,3 +710,145 @@ function make_image(base_image, xwidth, yheight, xSize, ySize, ctx) {
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(base_image, xwidth, yheight, xSize, ySize);}
 
+
+//Create and draw host buttons
+function drawHostButtons(gameStage) {
+    if(hostButtonPress[0]) {ctx.fillStyle = 'rgb(50,50,50)';} else {ctx.fillStyle = 'rgb(100,100,100)';}
+    ctx.fillRect(width-fontSize, fontSize/4, fontSize, fontSize);
+    if(gameStage == 0) {
+        make_image(gear, width-fontSize, fontSize/4, fontSize, fontSize, ctx);
+        if(hostButtonPress[1] == true) {
+            ctx.fillStyle = 'rgb(150,150,150)';
+            ctx.fillRect(width/2, fontSize/4+fontSize+pad, width/2, height/2);
+
+            ctx.fillStyle = 'rgb(255,255,255)';
+            ctx.font = 'bold ' + fontSize/2 + 'px' + ' ' + 'Ariel';
+            ctx.textAlign = 'center';
+            let intSpot = fontSize/4+fontSize*1.5+pad;
+            ctx.fillText('SETTINGS', width*(3/4), intSpot, width/2);
+
+            for ( let i = 0; i < hostOptions.length; i++) {
+                ctx.fillText(hostOptions[i].name, width*(3/4), intSpot + (fontSize/2+pad)*(i+1), width/4);
+                if(hostOptions[i].opt1) {ctx.fillStyle = 'rgb(50,50,50)';} else {ctx.fillStyle = 'rgb(100,100,100)';}
+                ctx.fillRect(width*(7/8), intSpot + (fontSize/2+pad)*(i+1)-fontSize*(3/8), width/8, fontSize/2);
+                ctx.fillStyle = 'rgb(255,255,255)';
+                ctx.fillText('+', width*(15/16), intSpot + (fontSize/2+pad)*(i+1), width/4);
+                if(hostOptions[i].opt2) {ctx.fillStyle = 'rgb(50,50,50)';} else {ctx.fillStyle = 'rgb(100,100,100)';}
+                ctx.fillRect(width/2, intSpot + (fontSize/2+pad)*(i+1)-fontSize*(3/8), width/8, fontSize/2);
+                ctx.fillStyle = 'rgb(255,255,255)';
+                ctx.fillText('-', width*(9/16), intSpot + (fontSize/2+pad)*(i+1), width/4);
+            }
+        } else {
+            
+        }
+    } else {
+        make_image(arrow, width-fontSize, fontSize/4, fontSize, fontSize, ctx);
+    }
+}
+
+//Check Host button press
+function updateHostButtons(gameStage, isPressed) {
+    if(isPressed) {
+        //Update Gear button
+        if(curX > width-fontSize && curX < width && curY > fontSize/4 && curY < fontSize+fontSize/4) {
+            hostButtonPress[0] = true;
+            if(gameStage == 0) {
+                if(hostButtonPress[1] == true) {hostButtonPress[1] = false;} else {hostButtonPress[1] = true;}
+            } else {
+                resetRound(0);
+            }
+        } else {
+            hostButtonPress[0] = false;
+        }
+        //Update Options Buttons
+        if (hostButtonPress[1] == true) {
+            let intSpot = fontSize/4+fontSize*1.5+pad;
+            for(let i = 0; i < hostOptions.length; i++) {
+                if(curX > width*(7/8) && curX < width && curY > intSpot + (fontSize/2+pad)*(i+1)-fontSize*(3/8) && curY < intSpot + (fontSize/2+pad)*(i+1)-fontSize*(3/8) + fontSize/2) {
+                    hostOptions[i].opt1 = true;
+                    updateHostOptions(i, 1);
+                } else {hostOptions[i].opt1 = false;}
+                if(curX > width/2 && curX < width*(5/8) && curY > intSpot + (fontSize/2+pad)*(i+1)-fontSize*(3/8) && curY < intSpot + (fontSize/2+pad)*(i+1)-fontSize*(3/8) + fontSize/2) {
+                    hostOptions[i].opt2 = true;
+                    updateHostOptions(i, 2);
+                } else {hostOptions[i].opt2 = false;}
+            }
+        }
+    } else {
+        hostButtonPress[0] = false;
+        for(let i = 0; i < hostOptions.length; i++) {
+            hostOptions[i].opt1 = false;
+            hostOptions[i].opt2 = false;
+        }
+    }
+}
+
+//Create host options
+function createHostOptions() {
+    // Name, Plus, Minus
+    let data = {name: 'Player Limit: ' + GameRoomData.playerLimit, opt1: false, opt2: false}
+    hostOptions[0] = data;
+    data = {name: 'Starting Bank: ' + startingBank, opt1: false, opt2: false}
+    hostOptions[1] = data;
+    data = {name: 'Win Multiplier: ' + winMult.toFixed(1) + 'x', opt1: false, opt2: false}
+    hostOptions[2] = data;
+}
+
+function updateHostOptions(optionIndex, buttonIndex) {
+    //Protect Host Privileges
+    if(sockets.id == GameRoomData.hostSocketId) {
+        switch (optionIndex) {
+            //PlayerLimit
+            case 0:
+                if(buttonIndex == 1) {
+                    GameRoomData.playerLimit = GameRoomData.playerLimit + 1;
+                    GameRoomData.Seats[GameRoomData.playerLimit-1] = 'EMPTY';
+                    createSeats();
+                } else if (buttonIndex == 2) {
+                    if(GameRoomData.playerCount < GameRoomData.playerLimit) {
+                        if(GameRoomData.Seats[GameRoomData.Seats.length-1] != 'EMPTY') {
+                            //Find new location for player in removed seat
+                            for(let i = 0; i < GameRoomData.Seats.length-1; i++) {
+                                if(GameRoomData.Seats[i] == 'EMPTY') {
+                                    GameRoomData.Seats[i] = GameRoomData.Seats[GameRoomData.Seats.length-1];
+                                    GameRoomData.Seats[GameRoomData.Seats.length-1] = 'EMPTY';
+                                    GameRoomData.Seats[i].seat = i;
+                                }
+                            }
+                        }
+                        GameRoomData.playerLimit = GameRoomData.playerLimit - 1;
+                        GameRoomData.Seats.length = GameRoomData.Seats.length - 1;
+                        createSeats();
+                    } else {console.log("Room already at minimum capacity!");}
+                }
+                sendGameUpdate();
+                hostOptions[optionIndex].name = 'Player Limit: ' + GameRoomData.playerLimit;
+                break;
+            //Starting Bank
+            case 1:
+                if(buttonIndex == 1) {
+                    startingBank += 100;
+                    for(let i = 0; i < GameRoomData.playerLimit; i++) {
+                        GameRoomData.Seats[i].bank = startingBank;
+                    }
+                } else if (buttonIndex == 2) {
+                    startingBank -= 100;
+                    for(let i = 0; i < GameRoomData.playerLimit; i++) {
+                        GameRoomData.Seats[i].bank = startingBank;
+                    }
+                }
+                hostOptions[optionIndex].name = 'Starting Bank: ' + startingBank;
+                break;
+            //Win Multiplier
+            case 2:
+                if(buttonIndex == 1) {
+                    winMult +=0.1;
+                } else if (buttonIndex == 2) {
+                    winMult -=0.1;
+                }
+                winMult.toFixed(1);
+                hostOptions[optionIndex].name = 'Win Multiplier: ' + winMult.toFixed(1) + 'x';
+                break;
+        }
+    }
+}
