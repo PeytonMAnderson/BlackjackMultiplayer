@@ -114,7 +114,7 @@ jQuery(function($){
                 document.getElementById("t2").innerHTML = GameRoomData.gameId;  //Add gameId to top bar
                 document.getElementById("t1").innerHTML = GameRoomData.playerCount + '/' + GameRoomData.playerLimit;    //Add playercount to top bar
                 initSeats();
-                updatePlayer(myName, [], sockets.id, 2000, 0, false, false, 'NULL', 0);
+                updatePlayer(myName, [], sockets.id, startingBank, 0, false, false, 'NULL', 0);
                 GameRoomData.hostSocketId = sockets.id;
                 runJavaScriptApp();
             } else {console.log("Failed to join game");}
@@ -157,6 +157,8 @@ jQuery(function($){
                 IO.socket.emit('playerJoinREQ', data);
             },
             gameUpdateACK : function (data) {
+                let updateSeats = false;
+                if(GameRoomData.playerLimit != data.playerLimit) updateSeats = true;
                 if(GameRoomData.gameStage > data.gameStage) resetLocals();
                 if(GameRoomData.timeLeft !=  data.timeLeft) timeSinceUpdate = 0;
                 LostPlayersMap = new Map(JSON.parse(data.LostPlayers));
@@ -180,6 +182,7 @@ jQuery(function($){
                     Seats: data.Seats,               
                     LostPlayers: LostPlayersMap,            
                 }
+                if(updateSeats) createSeats();
                 document.getElementById("t3").innerHTML = myName;   //Add name to top bar
                 document.getElementById("t2").innerHTML = GameRoomData.gameId;  //Add gameId to top bar
                 document.getElementById("t1").innerHTML = GameRoomData.playerCount + '/' + GameRoomData.playerLimit;    //Add playercount to top bar
@@ -199,13 +202,13 @@ jQuery(function($){
             getDealersHiddenACK : function (data) {
                 GameRoomData.DealerHand[1] = data;
                 for(let i = cardArray.length-1; i > 0; i--) {
-                    if(cardArray[i].card.face == 'BACK') {
+                    if(cardArray[i].card.cardValue == 'HIDDEN') {
                         cardArray[i].card.cardValue = data;
                         cardArray[i].card.face = 'FRONT';
                         break;
                     }
                 }
-
+                recLatestCard = true;
             },
             hostLeft : function () {
                 App.$gameArea.html(App.$templateReturn);
@@ -253,7 +256,7 @@ jQuery(function($){
                     while(GameRoomData.Seats[ind] != 'EMPTY' && ind < GameRoomData.playerLimit) {ind++;}
                     if(GameRoomData.Seats[ind] != 'EMPTY') {console.log('Unable to find empty seat!'); return;}
                     //Empty seat is available
-                    updatePlayer(data.name, [], data.socketId, 2000, 0, false, false, 'NULL', ind);
+                    updatePlayer(data.name, [], data.socketId, startingBank, 0, false, false, 'NULL', ind);
                 }
                 GameRoomData.playerCount++;
                 requestPlayerToJoin(ind);
@@ -339,6 +342,7 @@ jQuery(function($){
             readyUpREQ : function(data) {
                 let thePlayer = GameRoomData.Seats[data.player.seat];
                 if(thePlayer.fold == false) thePlayer.ready = true;
+                sendGameUpdate();
             }
         }
     };
