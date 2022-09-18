@@ -104,11 +104,13 @@ async function updateCountdown() {
     if(intervalID == undefined) {
         intervalID = setInterval(() => {
             if(GameRoomData.timeLeft == 'NULL') {
-                clearInterval(intervalID); 
+                clearInterval(intervalID);
+                intervalID = undefined;
                 return;}
             if(GameRoomData.timeLeft <= 0) {
                 GameRoomData.timeLeft = 0;
                 clearInterval(intervalID); 
+                intervalID = undefined;
                 return;}
             GameRoomData.timeLeft = GameRoomData.timeLeft - 1;
             timeSinceUpdate = 0;
@@ -189,7 +191,7 @@ function checkDeltBJ() {
         if(GameRoomData.Seats[i] != 'EMPTY') {
             if(!GameRoomData.Seats[i].fold) {
                 if(calcBJValue(GameRoomData.Seats[i].myHand) == 21) {
-                    GameRoomData.Seats[i].bank = GameRoomData.Seats[i].bank + (GameRoomData.Seats[i].bet * winMult.toFixed(1) * 1.5);
+                    GameRoomData.Seats[i].bank = GameRoomData.Seats[i].bank + (GameRoomData.Seats[i].bet * GameRoomData.winMult.toFixed(1) * 1.5);
                     GameRoomData.Seats[i].bet = 0;
                     GameRoomData.Seats[i].ready = true;
                     GameRoomData.Seats[i].win = 'W';
@@ -371,7 +373,7 @@ function resetRound(gameStage) {
             GameRoomData.Seats[i].ready = false;
             GameRoomData.Seats[i].fold = false;
             if(gameStage == 0) {
-                GameRoomData.Seats[i].bank = startingBank;
+                GameRoomData.Seats[i].bank = GameRoomData.startingBank;
                 GameRoomData.Seats[i].bet = 0;
             }
         }

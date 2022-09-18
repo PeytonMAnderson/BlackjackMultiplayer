@@ -13,10 +13,12 @@ var GameRoomData = {
     color: '0,0,0',              
     playerCount: 1,              
     playerLimit: 8,               
-    gameStage: 0,                
-    round: 0,                
+    gameStage: 0,                                
     turn: 0,               
-    timeLeft: 'NULL',              
+    timeLeft: 'NULL', 
+    timeLimit: 30,
+    startingBank: 2000,
+    winMult: 2.0,        
     DealerHand: dealerHand,               
     Seats: Seats,               
     LostPlayers: LostPlayersMap,            
@@ -114,7 +116,7 @@ jQuery(function($){
                 document.getElementById("t2").innerHTML = GameRoomData.gameId;  //Add gameId to top bar
                 document.getElementById("t1").innerHTML = GameRoomData.playerCount + '/' + GameRoomData.playerLimit;    //Add playercount to top bar
                 initSeats();
-                updatePlayer(myName, [], sockets.id, startingBank, 0, false, false, 'NULL', 0);
+                updatePlayer(myName, [], sockets.id, GameRoomData.startingBank, 0, false, false, 'NULL', 0);
                 GameRoomData.hostSocketId = sockets.id;
                 runJavaScriptApp();
             } else {console.log("Failed to join game");}
@@ -177,7 +179,10 @@ jQuery(function($){
                     gameStage: data.gameStage,                
                     round: data.round,                
                     turn: data.turn,               
-                    timeLeft: data.timeLeft,              
+                    timeLeft: data.timeLeft,
+                    timeLimit: data.timeLimit,
+                    startingBank: data.startingBank,
+                    winMult: data.winMult,              
                     DealerHand: data.DealerHand,               
                     Seats: data.Seats,               
                     LostPlayers: LostPlayersMap,            
@@ -256,7 +261,7 @@ jQuery(function($){
                     while(GameRoomData.Seats[ind] != 'EMPTY' && ind < GameRoomData.playerLimit) {ind++;}
                     if(GameRoomData.Seats[ind] != 'EMPTY') {console.log('Unable to find empty seat!'); return;}
                     //Empty seat is available
-                    updatePlayer(data.name, [], data.socketId, startingBank, 0, false, false, 'NULL', ind);
+                    updatePlayer(data.name, [], data.socketId, GameRoomData.startingBank, 0, false, false, 'NULL', ind);
                 }
                 GameRoomData.playerCount++;
                 requestPlayerToJoin(ind);
@@ -328,14 +333,14 @@ jQuery(function($){
                             thePlayer.ready = true;
                             GameRoomData.turn++;
                             findNextPlayer();
-                            sendGameUpdate();
+                            stopCountdown();
                         }
                         break;
                     case 'Stay':
                         thePlayer.ready = true;
                         GameRoomData.turn++;
                         findNextPlayer();
-                        sendGameUpdate();
+                        stopCountdown();
                         break;
                 }
             },
@@ -376,10 +381,12 @@ jQuery(function($){
         gameStage: GameRoomData.gameStage,
         playerCount: GameRoomData.playerCount,
         playerLimit: GameRoomData.playerLimit,
-        color: GameRoomData.color,              
-        round: GameRoomData.round,                
+        color: GameRoomData.color,                            
         turn: GameRoomData.turn,               
-        timeLeft: GameRoomData.timeLeft,              
+        timeLeft: GameRoomData.timeLeft,
+        timeLimit: GameRoomData.timeLimit,
+        startingBank: GameRoomData.startingBank,
+        winMult: GameRoomData.winMult,                
         DealerHand: GameRoomData.DealerHand,               
         Seats: GameRoomData.Seats,               
         LostPlayers: LostPlayersJSON,    
@@ -407,7 +414,10 @@ jQuery(function($){
         gameStage: 0,                
         round: 0,                
         turn: 0,               
-        timeLeft: 'NULL',              
+        timeLeft: 'NULL',
+        timeLimit: 30,
+        startingBank: 2000,
+        winMult: 2.0,               
         DealerHand: dealerHand,               
         Seats: Seats,               
         LostPlayers: LostPlayersMap,            

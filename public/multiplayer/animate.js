@@ -15,6 +15,7 @@ var beginTime = 0;
 var timeElapsed = 0;
 var FPS = 0;
 var FPSText;
+
 //COUNTDOWN
 var intervalID = undefined;
 
@@ -68,10 +69,6 @@ var gear = new Image();
 gear.src = window.location.protocol+'//'+window.location.host+'/textures/gear.png';
 var arrow = new Image();
 arrow.src = window.location.protocol+'//'+window.location.host+'/textures/arrow.png';
-var plus = new Image();
-plus.src = window.location.protocol+'//'+window.location.host+'/textures/plus.png';
-var minus = new Image();
-minus.src = window.location.protocol+'//'+window.location.host+'/textures/minus.png';
 
 //Local Cards
 var cardArray = new Array();
@@ -85,10 +82,6 @@ var cardTime = 0;
 // Gear, Settings menu
 var hostButtonPress = [false, false];
 var hostOptions = new Array();
-
-//Host Options
-var startingBank = 2000;
-var winMult = 2.0;
 
 //Controls elements of text on screen
 class ScreenText {
@@ -370,9 +363,9 @@ function drawBettingScreen() {
     drawSeats(true);
     drawBettingButtons();
     drawBankText();
-    drawCountdown(30);
+    drawCountdown(GameRoomData.timeLimit);
     if(sockets.id == GameRoomData.hostSocketId) {
-        if(GameRoomData.timeLeft == 'NULL') {startCountdown(30);}
+        if(GameRoomData.timeLeft == 'NULL') {startCountdown(GameRoomData.timeLimit);}
         let lobbyReady = true;
         for(let i = 0; i < GameRoomData.playerLimit; i++) {
             if(GameRoomData.Seats[i].ready == false && GameRoomData.Seats[i].fold == false) {lobbyReady = false; break;}
@@ -433,7 +426,15 @@ function drawPlayingScreen() {
     drawCards();
     drawPlayingButtons();
     drawBJText();
+    drawCountdown(GameRoomData.timeLimit);
     if(GameRoomData.hostSocketId == sockets.id) {
+        if(GameRoomData.timeLeft <= 0) {
+            GameRoomData.Seats[GameRoomData.turn].ready = true;
+            GameRoomData.turn++;
+            findNextPlayer();
+            stopCountdown();
+        } else if (intervalID == undefined) {startCountdown(GameRoomData.timeLimit);}
+        
         //After all player's turn
         if(GameRoomData.turn >= GameRoomData.playerLimit) {
             sockets.emit('getDealersHidden', GameRoomData.gameId);
@@ -442,17 +443,17 @@ function drawPlayingScreen() {
             unreadyEveryone();
             GameRoomData.gameStage = 4;
             GameRoomData.turn = 0;
-            sendGameUpdate();
+            stopCountdown();
         //If the current seat is not playable
         } else if (GameRoomData.Seats[GameRoomData.turn] == 'EMPTY' || GameRoomData.Seats[GameRoomData.turn].fold || GameRoomData.Seats[GameRoomData.turn].ready) {
-            if (GameRoomData.turn == 0) {findNextPlayer();  sendGameUpdate();}
+            if (GameRoomData.turn == 0) {findNextPlayer();  stopCountdown();}
         //If current player busted, move to next
         } else if (calcBJValue(GameRoomData.Seats[GameRoomData.turn].myHand) == 'BUST') {
             GameRoomData.Seats[GameRoomData.turn].win = 'L';
             GameRoomData.Seats[GameRoomData.turn].bet = 0;
             GameRoomData.turn++;
             findNextPlayer();
-            sendGameUpdate();
+            stopCountdown();
         }
     }
 }
@@ -463,10 +464,13 @@ function drawEndScreen() {
     drawCards();
     drawBJText();
     calcWinState();
+    drawCountdown(GameRoomData.timeLimit);
     if(winStateTxt.text != 'NULL')  winStateTxt.draw(ctx);
     //If no one played this round
     if(cardArray.length < 3) {resetRound(1);    sendGameUpdate();}
     if(GameRoomData.hostSocketId == sockets.id) {
+        if (GameRoomData.timeLeft <= 0) {resetRound(1);   stopCountdown();}
+        else if(intervalID == undefined) {startCountdown(GameRoomData.timeLimit);}
         //If Dealer has less than 17, add more cards
         let dealerV = calcBJValue(GameRoomData.DealerHand);
         if(latestCard != undefined && !latestCard.animating && recLatestCard && dealerV != 'BUST' && dealerV < 17) {
@@ -482,7 +486,7 @@ function drawEndScreen() {
                     if(!GameRoomData.Seats[i].fold) {
                         if(GameRoomData.Seats[i].win == 'NULL') {
                             GameRoomData.Seats[i].win = 'W';
-                            GameRoomData.Seats[i].bank = GameRoomData.Seats[i].bank + (GameRoomData.Seats[i].bet * winMult.toFixed(1));
+                            GameRoomData.Seats[i].bank = GameRoomData.Seats[i].bank + (GameRoomData.Seats[i].bet * GameRoomData.winMult.toFixed(1));
                             GameRoomData.Seats[i].bet = 0; 
                             sendGameUpdate();
                         }
@@ -490,7 +494,7 @@ function drawEndScreen() {
                     }
                 }
             }
-            if(ready) {resetRound(1);   sendGameUpdate();}
+            if(ready) {resetRound(1);   stopCountdown();}
         //Dealer reached 17, compare everyone still in
         } else if(dealerV >= 17 && !latestCard.animating) {
             let ready = true;
@@ -501,7 +505,7 @@ function drawEndScreen() {
                             let playerV = calcBJValue(GameRoomData.Seats[i].myHand);
                             if(playerV > dealerV) {
                                 GameRoomData.Seats[i].win = 'W';
-                                GameRoomData.Seats[i].bank = GameRoomData.Seats[i].bank + (GameRoomData.Seats[i].bet * winMult.toFixed(1));                        
+                                GameRoomData.Seats[i].bank = GameRoomData.Seats[i].bank + (GameRoomData.Seats[i].bet * GameRoomData.winMult.toFixed(1));                        
                             } else if(playerV == dealerV) {
                                 GameRoomData.Seats[i].win = 'T';
                                 GameRoomData.Seats[i].bank = GameRoomData.Seats[i].bank + GameRoomData.Seats[i].bet;            
@@ -515,7 +519,7 @@ function drawEndScreen() {
                     }
                 }
             }
-            if(ready) {resetRound(1);   sendGameUpdate();}
+            if(ready) {resetRound(1);   stopCountdown();}
         }
     }
 }
@@ -727,16 +731,17 @@ function drawHostButtons(gameStage) {
             let intSpot = fontSize/4+fontSize*1.5+pad;
             ctx.fillText('SETTINGS', width*(3/4), intSpot, width/2);
 
+            let butHeight = height/2 - fontSize - (fontSize/2)*(hostOptions.length-1);
             for ( let i = 0; i < hostOptions.length; i++) {
-                ctx.fillText(hostOptions[i].name, width*(3/4), intSpot + (fontSize/2+pad)*(i+1), width/4);
+                ctx.fillText(hostOptions[i].name, width*(3/4), intSpot + (butHeight/hostOptions.length + fontSize/2)*i + butHeight/(hostOptions.length*2) + fontSize/4, width/4);
                 if(hostOptions[i].opt1) {ctx.fillStyle = 'rgb(50,50,50)';} else {ctx.fillStyle = 'rgb(100,100,100)';}
-                ctx.fillRect(width*(7/8), intSpot + (fontSize/2+pad)*(i+1)-fontSize*(3/8), width/8, fontSize/2);
+                ctx.fillRect(width*(7/8), intSpot + (butHeight/hostOptions.length + fontSize/2)*i, width/8, butHeight/hostOptions.length);
                 ctx.fillStyle = 'rgb(255,255,255)';
-                ctx.fillText('+', width*(15/16), intSpot + (fontSize/2+pad)*(i+1), width/4);
+                ctx.fillText('+', width*(15/16), intSpot + (butHeight/hostOptions.length + fontSize/2)*i + butHeight/(hostOptions.length*2) + fontSize/4, width/8);
                 if(hostOptions[i].opt2) {ctx.fillStyle = 'rgb(50,50,50)';} else {ctx.fillStyle = 'rgb(100,100,100)';}
-                ctx.fillRect(width/2, intSpot + (fontSize/2+pad)*(i+1)-fontSize*(3/8), width/8, fontSize/2);
+                ctx.fillRect(width/2, intSpot + (butHeight/hostOptions.length + fontSize/2)*i, width/8, butHeight/hostOptions.length);
                 ctx.fillStyle = 'rgb(255,255,255)';
-                ctx.fillText('-', width*(9/16), intSpot + (fontSize/2+pad)*(i+1), width/4);
+                ctx.fillText('-', width*(9/16), intSpot + (butHeight/hostOptions.length + fontSize/2)*i + butHeight/(hostOptions.length*2) + fontSize/4, width/8);
             }
         } else {
             
@@ -763,12 +768,15 @@ function updateHostButtons(gameStage, isPressed) {
         //Update Options Buttons
         if (hostButtonPress[1] == true) {
             let intSpot = fontSize/4+fontSize*1.5+pad;
+            let butHeight = height/2 - fontSize - (fontSize/2)*(hostOptions.length-1);
             for(let i = 0; i < hostOptions.length; i++) {
-                if(curX > width*(7/8) && curX < width && curY > intSpot + (fontSize/2+pad)*(i+1)-fontSize*(3/8) && curY < intSpot + (fontSize/2+pad)*(i+1)-fontSize*(3/8) + fontSize/2) {
+                if(curX > width*(7/8) && curX < width && curY > intSpot + (butHeight/hostOptions.length + fontSize/2)*i && 
+                                                         curY < intSpot + (butHeight/hostOptions.length + fontSize/2)*(i+1) - fontSize/2) {
                     hostOptions[i].opt1 = true;
                     updateHostOptions(i, 1);
                 } else {hostOptions[i].opt1 = false;}
-                if(curX > width/2 && curX < width*(5/8) && curY > intSpot + (fontSize/2+pad)*(i+1)-fontSize*(3/8) && curY < intSpot + (fontSize/2+pad)*(i+1)-fontSize*(3/8) + fontSize/2) {
+                if(curX > width/2 && curX < width*(5/8) && curY > intSpot + (butHeight/hostOptions.length + fontSize/2)*i && 
+                                                           curY < intSpot + (butHeight/hostOptions.length + fontSize/2)*(i+1) - fontSize/2) {
                     hostOptions[i].opt2 = true;
                     updateHostOptions(i, 2);
                 } else {hostOptions[i].opt2 = false;}
@@ -788,10 +796,12 @@ function createHostOptions() {
     // Name, Plus, Minus
     let data = {name: 'Player Limit: ' + GameRoomData.playerLimit, opt1: false, opt2: false}
     hostOptions[0] = data;
-    data = {name: 'Starting Bank: ' + startingBank, opt1: false, opt2: false}
+    data = {name: 'Starting Bank: $' + GameRoomData.startingBank, opt1: false, opt2: false}
     hostOptions[1] = data;
-    data = {name: 'Win Multiplier: ' + winMult.toFixed(1) + 'x', opt1: false, opt2: false}
+    data = {name: 'Win Multiplier: ' + GameRoomData.winMult.toFixed(1) + 'x', opt1: false, opt2: false}
     hostOptions[2] = data;
+    data = {name: 'Time Limit: ' + GameRoomData.timeLimit + 's', opt1: false, opt2: false}
+    hostOptions[3] = data;
 }
 
 function updateHostOptions(optionIndex, buttonIndex) {
@@ -827,27 +837,34 @@ function updateHostOptions(optionIndex, buttonIndex) {
             //Starting Bank
             case 1:
                 if(buttonIndex == 1) {
-                    startingBank += 100;
+                    GameRoomData.startingBank += 100;
                     for(let i = 0; i < GameRoomData.playerLimit; i++) {
-                        GameRoomData.Seats[i].bank = startingBank;
+                        GameRoomData.Seats[i].bank = GameRoomData.startingBank;
                     }
                 } else if (buttonIndex == 2) {
-                    startingBank -= 100;
+                    GameRoomData.startingBank -= 100;
                     for(let i = 0; i < GameRoomData.playerLimit; i++) {
-                        GameRoomData.Seats[i].bank = startingBank;
+                        GameRoomData.Seats[i].bank = GameRoomData.startingBank;
                     }
                 }
-                hostOptions[optionIndex].name = 'Starting Bank: ' + startingBank;
+                hostOptions[optionIndex].name = 'Starting Bank: $' + GameRoomData.startingBank;
                 break;
             //Win Multiplier
             case 2:
                 if(buttonIndex == 1) {
-                    winMult +=0.1;
+                    GameRoomData.winMult +=0.1;
                 } else if (buttonIndex == 2) {
-                    winMult -=0.1;
+                    GameRoomData.winMult -=0.1;
                 }
-                winMult.toFixed(1);
-                hostOptions[optionIndex].name = 'Win Multiplier: ' + winMult.toFixed(1) + 'x';
+                hostOptions[optionIndex].name = 'Win Multiplier: ' + GameRoomData.winMult.toFixed(1) + 'x';
+                break;
+            case 3:
+                if(buttonIndex == 1) {
+                    GameRoomData.timeLimit += 5;
+                } else if (buttonIndex == 2) {
+                    if(GameRoomData.timeLimit > 5) GameRoomData.timeLimit -= 5;
+                }
+                hostOptions[optionIndex].name = 'Time Limit: ' + GameRoomData.timeLimit + 's';
                 break;
         }
     }
